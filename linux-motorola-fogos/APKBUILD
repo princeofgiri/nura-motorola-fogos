@@ -1,0 +1,140 @@
+# Reference: <https://postmarketos.org/vendorkernel>
+# Kernel config based on: arch/arm64/configs/vendor/holi-qgki_defconfig
+#   + vendor/ext_config/lineage_moto-holi.config
+#   + vendor/ext_config/moto-holi-fogos.config
+#   (see config-motorola-fogos.aarch64 in this directory)
+maintainer="Fogos Porter <fogos@example.com>"
+pkgname=linux-motorola-fogos
+pkgver=5.4.302
+pkgrel=7
+pkgdesc="Motorola Moto G34 5G (fogos) downstream kernel"
+arch="aarch64"
+_carch="arm64"
+_flavor="motorola-fogos"
+url="https://github.com/LineageOS/android_kernel_motorola_sm6375"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps pmb:cross-native"
+makedepends="
+	bash
+	bc
+	bison
+	clang
+	devicepkg-dev
+	elfutils-dev
+	findutils
+	flex
+	linux-headers
+	lld
+	llvm
+	openssl-dev
+	pahole
+	patch
+	perl
+	postmarketos-installkernel
+	python3
+	xz
+	zstd
+"
+
+export CC="clang"
+export HOSTCC="clang"
+export LLVM="1"
+
+_repository="android_kernel_motorola_sm6375"
+_commit="c63a2b5a1b970f8b9a231ea6a536a14bad15eab2"
+_config="config-$_flavor.$arch"
+source="
+	$pkgname-$_commit.tar.gz::https://github.com/LineageOS/$_repository/archive/$_commit.tar.gz
+	$_config
+	0001-techpack-camera-use-make-builtins-for-include-dirs.patch
+"
+
+builddir="$srcdir/$_repository-$_commit"
+_outdir="out"
+
+prepare() {
+	default_prepare
+	# Create the merged fogos DT source (base + overlay chain) directly:
+	# BusyBox patch, used by abuild in the chroot, cannot create new
+	# files, so this is not carried as a patch. The overlay chain uses
+	# plain &label { } extension style (no fragment@/__overlay__), so it
+	# compiles cleanly into one blob. The thin EVT/DVT wrappers are
+	# skipped (they only carry qcom,msm-id/qcom,board-id for bootloader
+	# overlay matching); EVT and DVT1 differ in nothing else.
+	cat > "$builddir"/arch/arm64/boot/dts/vendor/qcom/blair-moto-fogos-pmos.dts <<-EOF
+	// SPDX-License-Identifier: GPL-2.0-only
+	/* Merged device tree for postmarketOS/Nura on Motorola fogos. */
+	/dts-v1/;
+
+	#include "blair-moto-fogos-base.dts"
+	/* Drop the base's empty battery-data placeholder: the overlay chain
+	 * defines its own populated qcom,battery-data (under /soc) with the
+	 * same label, and dtc rejects the duplicate. */
+	/ { /delete-node/ qcom,battery-data; };
+
+	#include "blair-pm6125-fogos-common-overlay.dtsi"
+
+	/* Touch power: the ilitek driver manages vdd+vcc supplies (both 1.8V)
+	 * and leaves the chip unpowered without them; stock trees carry no
+	 * supply links (the rail stays up via side effects there). Bind both
+	 * to L9A (pm6125_l9, 1.8V, defined in this same overlay chain).
+	 * chipone_tddi manages no regulators itself, so its node is untouched. */
+	&qupv3_se0_spi {
+		ilitek@1 {
+			vdd-supply = <&L9A>;
+			vcc-supply = <&L9A>;
+		};
+	};
+	EOF
+	# Register it for CONFIG_FOGOS_DTB (sed instead of a patch hunk;
+	# keeps the change next to the file it generates).
+	sed -i 's|^blair-fogos-dvt1-overlay.dtbo-base := blair-moto-fogos-base.dtb$|&\
+dtb-$(CONFIG_FOGOS_DTB) += blair-moto-fogos-pmos.dtb|' \
+		"$builddir"/arch/arm64/boot/dts/vendor/qcom/Makefile
+	grep -q '^dtb-$(CONFIG_FOGOS_DTB) += blair-moto-fogos-pmos.dtb$' \
+		"$builddir"/arch/arm64/boot/dts/vendor/qcom/Makefile || \
+		{ echo "ERROR: merged DTB registration failed"; exit 1; }
+	test -f "$builddir"/arch/arm64/boot/dts/vendor/qcom/blair-moto-fogos-pmos.dts || \
+		{ echo "ERROR: merged DTS creation failed"; exit 1; }
+	REPLACE_GCCH=0 . downstreamkernel_prepare
+}
+
+build() {
+	unset LDFLAGS
+	make O="$_outdir" ARCH="$_carch" CC="${CC:-gcc}" \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-postmarketOS"
+	# Explicitly build device trees: blair-moto-fogos-base.dtb is only a
+	# side effect of the FOGOS dtbo overlay build (referenced via
+	# "<overlay>.dtbo-base :=") and is not in dtb-y, so make sure the
+	# dtbs (and hence the base dtb) actually get compiled.
+	make O="$_outdir" ARCH="$_carch" CC="${CC:-gcc}" dtbs
+}
+
+package() {
+	downstreamkernel_package "$builddir" "$pkgdir" "$_carch" \
+		"$_flavor" "$_outdir"
+
+	make dtbs_install O="$_outdir" ARCH="$_carch" \
+		INSTALL_DTBS_PATH="$pkgdir"/boot/dtbs
+
+	# Install the merged fogos DTB (base + overlay chain, generated in
+	# prepare()). This must match deviceinfo_dtb
+	# ("vendor/qcom/blair-moto-fogos-pmos") in device-motorola-fogos. (dtbs_install already covers it since it
+	# is in dtb-y; installed explicitly as a guarantee.)
+	install -Dm644 "$builddir"/"$_outdir"/arch/"$_carch"/boot/dts/vendor/qcom/blair-moto-fogos-pmos.dtb \
+		"$pkgdir"/boot/dtbs/vendor/qcom/blair-moto-fogos-pmos.dtb
+
+	# Vendor DLKM modules (wlan, camera, audio, touchscreen, ...): without
+	# these the corresponding hardware stays dead.
+	make modules_install O="$_outdir" ARCH="$_carch" \
+		INSTALL_MOD_PATH="$pkgdir"/usr \
+		INSTALL_MOD_STRIP=1
+
+	rm -f "$pkgdir"/usr/lib/modules/*/build "$pkgdir"/usr/lib/modules/*/source
+}
+
+sha512sums="
+cc12206719afa04a35782061343de705109a8d28257eda08e92f9a8b2ae5f5b55dbcd745e33b42446157bfb9f3db263761c2adb7fb5ccee632403f004c324d07  linux-motorola-fogos-c63a2b5a1b970f8b9a231ea6a536a14bad15eab2.tar.gz
+3eec8b87e64192f622d15a1752d9adc60bed6dd1632b5a544cd7a3819755390f1c373d31b5b9369b65ac6c40ebd70ef3764b8191e94f91ee4b9529ad4cdcbc4a  config-motorola-fogos.aarch64
+6363ac672d2e37d62f98facc336cfc43260b5d8ceb37be5ee20e0e0cd3630c068b39d645490a4169af389abda35176c966cf77e390cd9403003ca2f8120ffcfa  0001-techpack-camera-use-make-builtins-for-include-dirs.patch
+"

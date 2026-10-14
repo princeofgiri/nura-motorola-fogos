@@ -1,0 +1,52 @@
+# Reference: <https://postmarketos.org/devicepkg>
+# Motorola Moto G34 5G (fogos). Downstream kernel 5.4 from LineageOS.
+# Conventions follow in-tree device-motorola-dubai (same ABL/fastboot family):
+# stock dtbo overlays target the stock DTB, so an empty dtbo image of the exact
+# partition size (BOARD_DTBOIMG_PARTITION_SIZE := 25165824) is flashed instead.
+# modules-initfs carries both touchscreen DLKM (chipone + ilitek, dual-source
+# panels; unit tested so far is TXD/ILI9883C, DTB has a chipone_tddi node)
+# so touch is already live in the initramfs debug shell.
+maintainer="Fogos Porter <fogos@example.com>"
+pkgname=device-motorola-fogos
+pkgdesc="Motorola Moto G34 5G"
+pkgver=3
+pkgrel=2
+url="https://postmarketos.org"
+license="MIT"
+arch="aarch64"
+options="!check !archcheck"
+depends="
+	linux-motorola-fogos
+	make-dynpart-mappings
+	mkbootimg
+	msm-firmware-loader
+	postmarketos-base
+	soc-qcom
+"
+makedepends="devicepkg-dev"
+source="
+	deviceinfo
+	kernel-cmdline.conf
+	modules-initfs
+"
+
+build() {
+	devicepkg_build $startdir $pkgname
+
+	# Empty dtbo image: the stock Android overlays must not be applied on
+	# top of our DTB. Motorola's fastboot refuses "fastboot erase dtbo",
+	# so a zero-filled image of the exact partition size is flashed instead.
+	dd if=/dev/zero of="$srcdir/dtbo.img" bs=25165824 count=1
+}
+
+package() {
+	devicepkg_package $startdir $pkgname
+
+	install -Dm644 "$srcdir/dtbo.img" "$pkgdir/boot/dtbo.img"
+}
+
+sha512sums="
+a891d10d667ac23e821f45b63b3f592198beb18c2d9b220b05f053f1081939149e52bd9dd801562aa533d1de619b38cf23fbe9426c74024f6ed1fcdc0608da89  deviceinfo
+8c03d60bc585fa5e196619f15522b77f9541f33868a81d427cc51661f57b5c5ddef2d99dfb81fa5e5408d82076cad8f412d88462295250fa53df7f407b98f2b9  kernel-cmdline.conf
+8de6a560a9ba2a2128c7361204c8a20d31ecab27e8688a33d800b0cbe201f7270e2099e868db2e8caa95baab78d3a5e71a8e6e0a309894c10d4a95afa1f1b17d  modules-initfs
+"

@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fogos Porter <fogos@example.com>
+Date: Mon, 12 Oct 2026 00:00:00 +0000
+Subject: [PATCH] techpack: camera: use make builtins for include dirs
+
+The camera DLKM Makefile built its header include list with:
+
+    cam_include_dirs := $(shell dirname `find $(cameratree) -name '*.h'` | uniq)
+
+BusyBox dirname (used in minimal build chroots such as Alpine's) only
+accepts a single operand, so with more than one header found it prints
+its usage text to stderr and yields an empty list on stdout. The camera
+modules then lose all their -I paths and the build fails with:
+
+    cam_req_mgr_debug.h:11:10: fatal error: 'cam_debug_util.h' file not found
+
+Use the $(dir) make builtin instead (works per-word regardless of the
+shell/coreutils flavour) and $(sort) for dedup instead of uniq.
+
+Signed-off-by: Fogos Porter <fogos@example.com>
+---
+ techpack/camera/drivers/Makefile | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/techpack/camera/drivers/Makefile b/techpack/camera/drivers/Makefile
+index 1111111..2222222 100644
+--- a/techpack/camera/drivers/Makefile
++++ b/techpack/camera/drivers/Makefile
+@@ -2,7 +2,11 @@
+ 
+ cameratree := $(srctree)/techpack/camera/drivers
+ 
+-cam_include_dirs := $(shell dirname `find $(cameratree) -name '*.h'` | uniq)
++# NOTE: do not use `dirname $(find ...)` here: BusyBox dirname only accepts
++# a single operand, so the include list comes out empty and the camera DLKM
++# fails with "cam_debug_util.h file not found". $(dir) is a make builtin
++# and $(sort) dedupes, so this works with any shell/coreutils combination.
++cam_include_dirs := $(sort $(dir $(shell find $(cameratree) -name '*.h')))
+ ccflags-y += $(addprefix -I,$(cam_include_dirs))
+ 
+ ifneq (,$(filter $(CONFIG_MSM_GLOBAL_SYNX), y m))
+-- 
+2.56.0
+

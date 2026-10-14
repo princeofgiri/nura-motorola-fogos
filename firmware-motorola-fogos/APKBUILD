@@ -1,0 +1,46 @@
+# Firmware for Motorola Moto G34 5G (fogos): NFC, touchscreen and audio
+# blobs loaded directly by their drivers (no pil-squasher needed), plus the
+# Adreno a619/a630 firmware from the sm6375-common vendor tree.
+# Sources: BAHAN.txt (TheMuppets), pinned to V1UGS35H.75-14-3-10.
+# NOTE: WiFi (qca_cld3/wlan.ko) and Bluetooth (BTFM) firmware are NOT in
+# these repos; they must come from the stock firmware package or
+# linux-firmware (see tmp/device-common + tmp/stock). Touchscreen ships
+# both variants because fogos panels are dual-sourced (chipone/ilitek).
+maintainer="Fogos Porter <fogos@example.com>"
+pkgname=firmware-motorola-fogos
+pkgver=2
+pkgrel=0
+pkgdesc="Firmware for Motorola Moto G34 5G"
+url="https://github.com/TheMuppets/proprietary_vendor_motorola_fogos"
+arch="aarch64"
+license="proprietary"
+options="!check !strip !archcheck !spdx !tracedeps pmb:cross-native"
+_fogos_commit="d11da221738c6bff9c8e57115825c058f1c94ebe"
+_common_commit="450f2687811de53101e66d190bfd9e3017126dc9"
+source="$pkgname-$_fogos_commit.tar.gz::https://github.com/TheMuppets/proprietary_vendor_motorola_fogos/archive/$_fogos_commit.tar.gz
+	$pkgname-common-$_common_commit.tar.gz::https://github.com/TheMuppets/proprietary_vendor_motorola_sm6375-common/archive/$_common_commit.tar.gz"
+builddir="$srcdir"
+
+package() {
+	mkdir -p "$pkgdir"
+
+	# NFC (sec_s3nrn4v), touchscreens (chipone/ilitek), amp (aw963xx, fs1815)
+	_fogos_dir="$builddir"/proprietary_vendor_motorola_fogos-$_fogos_commit
+	for _f in sec_s3nrn4v_firmware.bin chipone_firmware.bin aw963xx_reg_0.bin \
+		fs1815.fsm ILITEK_FW; do
+		install -Dm644 "$_fogos_dir"/proprietary/vendor/firmware/"$_f" \
+			-t "$pkgdir"/lib/firmware/
+	done
+
+	# Adreno (a619 gmu, a630 sqe) from the sm6375-common tree
+	_common_dir="$builddir"/proprietary_vendor_motorola_sm6375-common-$_common_commit
+	install -Dm644 "$_common_dir"/proprietary/vendor/firmware/a619_gmu.bin \
+		-t "$pkgdir"/lib/firmware/qcom/
+	install -Dm644 "$_common_dir"/proprietary/vendor/firmware/a630_sqe.fw \
+		-t "$pkgdir"/lib/firmware/qcom/
+}
+
+sha512sums="
+175a52716a6f76a76ed26990c51dc980f4dee2d892f345e20697f3b726f6b04d62d309243c89b1a0879136c51ff7666e63ecf77790b12e3de43a11bdb034c429  firmware-motorola-fogos-d11da221738c6bff9c8e57115825c058f1c94ebe.tar.gz
+c4ed6fdfaef8b3ce1efcb07d128b98c0067bee5f3552bade35fd7f6c18b3952a58692e0c420bcbd0b7b99be62ff38ab33d1a6484cce761c05e31c763f6c453c9  firmware-motorola-fogos-common-450f2687811de53101e66d190bfd9e3017126dc9.tar.gz
+"

@@ -1,0 +1,10 @@
+# Build artifacts & local-only data (never commit these)
+*.img
+*.tar.gz
+*.apk
+*.log
+*.old
+__pycache__/
+stock-backup/
+tmp/
+.cache/

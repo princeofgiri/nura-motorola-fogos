@@ -1,0 +1,53 @@
+# Reference: <https://postmarketos.org/deviceinfo>
+# Please use double quotes only. You can source this file in shell
+# scripts.
+#
+# Motorola Moto G34 5G (fogos), SM6375 (holi/bliar), downstream kernel 5.4.
+# Values derived from:
+# - android_device_motorola_fogos @ lineage-24.0 :: BoardConfig.mk
+# - android_device_motorola_sm6375-common @ lineage-24.0 :: BoardConfigCommon.mk
+# Layout conventions follow in-tree motorola-dubai (same ABL/fastboot family):
+# stock boot header v3 is downgraded to v2 for mkbootimg compatibility,
+# and the stock dtbo is replaced by an empty image (see APKBUILD).
+
+deviceinfo_format_version="0"
+deviceinfo_name="Motorola Moto G34 5G"
+deviceinfo_manufacturer="Motorola"
+deviceinfo_codename="motorola-fogos"
+deviceinfo_year="2023"
+deviceinfo_dtb="vendor/qcom/blair-moto-fogos-pmos"
+deviceinfo_append_dtb="true"
+deviceinfo_flash_kernel_on_update="true"
+deviceinfo_arch="aarch64"
+
+# Device related
+deviceinfo_chassis="handset"
+deviceinfo_drm="true"
+deviceinfo_getty="ttyMSM0;115200"
+deviceinfo_screen_width="720"
+deviceinfo_screen_height="1600"
+deviceinfo_external_storage="true"
+
+# Bootloader related
+deviceinfo_flash_method="fastboot"
+deviceinfo_boot_filesystem="fat32"
+deviceinfo_generate_bootimg="true"
+deviceinfo_header_version="2"
+deviceinfo_flash_pagesize="4096"
+deviceinfo_flash_offset_base="0x00000000"
+deviceinfo_flash_offset_kernel="0x00008000"
+deviceinfo_flash_offset_ramdisk="0x01000000"
+deviceinfo_flash_offset_second="0x00000000"
+deviceinfo_flash_offset_tags="0x00000100"
+deviceinfo_flash_offset_dtb="0x01f00000"
+deviceinfo_rootfs_image_sector_size="4096"
+deviceinfo_initfs_compression="gzip"
+deviceinfo_kernel_cmdline="androidboot.console=ttyMSM0 androidboot.hardware=qcom androidboot.memcg=1 androidboot.usbcontroller=4e00000.dwc3 cgroup.memory=nokmem,nosocket ip6table_raw.raw_before_defrag=1 iptable_raw.raw_before_defrag=1 loop.max_part=7 lpm_levels.sleep_disabled=1 msm_rtb.filter=0x237 pcie_ports=compat service_locator.enable=1 swiotlb=0 androidboot.hab.product=fogos"
+deviceinfo_bootimg_custom_args="--os_patch_level 2026-09-01"
+deviceinfo_flash_fastboot_partition_vbmeta="vbmeta"
+deviceinfo_flash_fastboot_partition_dtbo="dtbo"
+deviceinfo_flash_sparse="true"
+
+# Dynamic-partition super (single, unslotted): verified live via sysfs
+# (/sys/block/sde/sde25 PARTNAME=super) + /dev/disk/by-partlabel/super.
+deviceinfo_super_partitions="/dev/disk/by-partlabel/super"

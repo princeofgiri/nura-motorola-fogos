@@ -7,7 +7,7 @@
 maintainer="Fogos Porter <fogos@example.com>"
 pkgname=weston
 pkgver=16.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Reference compositor for Wayland (fogos downstream-DRM fix)"
 url="https://waylab.freedesktop.org/weston/"
 arch="all"
@@ -16,6 +16,7 @@ depends="libweston=$pkgver-r$pkgrel"
 makedepends="
 	cairo-dev
 	expat-dev
+	fontconfig-dev
 	libdrm-dev
 	libevdev-dev
 	libdisplay-info-dev
@@ -27,6 +28,7 @@ makedepends="
 	libxkbcommon-dev
 	lcms2-dev
 	mesa-dev
+	pango-dev
 	meson
 	pixman-dev
 	vulkan-headers
@@ -38,10 +40,12 @@ subpackages="
 	$pkgname-backend-drm:backend_drm
 	$pkgname-backend-headless:backend_headless
 	$pkgname-dev
+	$pkgname-shell-desktop:shell_desktop
 	libweston
 	"
 source="https://gitlab.freedesktop.org/wayland/weston/-/archive/$pkgver/weston-$pkgver.tar.gz
 	0001-libweston-tolerate-duplicate-formats.patch
+	0002-libweston-tolerate-duplicate-modifiers.patch
 	"
 options="!check"
 
@@ -58,14 +62,14 @@ build() {
 		-Drenderer-vulkan=false \
 		-Dxwayland=false \
 		-Dsystemd=false \
-		-Dshell-desktop=false \
+		-Dshell-desktop=true \
+	-Ddemo-clients=true \
 		-Dshell-ivi=false \
 		-Dshell-kiosk=false \
 		-Dshell-lua=false \
 		-Dcolor-management-lcms=true \
 		-Dimage-jpeg=true \
 		-Dimage-webp=true \
-		-Ddemo-clients=false \
 		-Dtests=false \
 		-Dtest-junit-xml=false \
 		. output
@@ -96,6 +100,11 @@ dev() {
 	default_dev
 }
 
+shell_desktop() {
+	pkgdesc="Weston desktop shell"
+	amove usr/lib/weston/desktop-shell.so
+}
+
 libweston() {
 	pkgdesc="Weston compositor library"
 	amove usr/lib/libweston-16.so.*
@@ -105,4 +114,5 @@ libweston() {
 sha512sums="
 7d3b023bc50d9cde35ca97525b1136e7ef201abee4d12c05ddd3d4084e18bb323710b9bfc5e700d7d34d6ada3cdf9521bcdc731487eaa613e14787d47a113e97  weston-16.0.0.tar.gz
 fe58aa49c2f608a497c71b738bcc37b2079101916b87e400de36bd8abc1be5bd615a31136ec61f838e80170f4fb9e4d5c91bd587b501dadba9ac62a1d840ffa3  0001-libweston-tolerate-duplicate-formats.patch
+c33b42afae6304a678c04f1966e5e87d4f43469aa3e9b669d300058e3aa7d1e8ce6bb76af64d01624dd9c2a2b3a4f29e3939e1ec0daf17aaa02769bda1fb8659  0002-libweston-tolerate-duplicate-modifiers.patch
 "

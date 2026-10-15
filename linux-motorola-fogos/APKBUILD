@@ -6,7 +6,7 @@
 maintainer="Fogos Porter <fogos@example.com>"
 pkgname=linux-motorola-fogos
 pkgver=5.4.302
-pkgrel=7
+pkgrel=9
 pkgdesc="Motorola Moto G34 5G (fogos) downstream kernel"
 arch="aarch64"
 _carch="arm64"
@@ -85,6 +85,29 @@ prepare() {
 			vcc-supply = <&L9A>;
 		};
 	};
+
+	/* EXPERIMENT r9: modem boot trigger. subsys-pil-tz only registers;
+	 * nothing in-kernel calls subsystem_get("modem") except adsp-loader
+	 * when qcom,proc-img-to-load="modem" (ours says adsp2). Here we use
+	 * the pon-depends-on mechanism instead: __subsystem_get() boots
+	 * desc->pon_depends_on first (msm_subsystem_restart.c:824), and the
+	 * property is parsed from the subsys DT node. So booting ADSP via
+	 * `echo 1 > /sys/kernel/boot_adsp/boot` will PIL modem first.
+	 * Reversible: drop this block if modem misbehaves. */
+	&pil_lpass {
+		qcom,pon-depends-on = "modem";
+	};
+
+	/* pstore ramoops rebalance (same total 0xBF800: console 256K->512K
+	 * for Weston atomic-hang traces; pmsg/record shrunk accordingly).
+	 * Regions below (WDOG_CPUCTX/TZLOG/MMI) untouched. */
+	&reserved_memory {
+		ramoops_mem {
+			console-size = <0x80000>;
+			pmsg-size = <0x20000>;
+			record-size = <0x1f800>;
+		};
+	};
 	EOF
 	# Register it for CONFIG_FOGOS_DTB (sed instead of a patch hunk;
 	# keeps the change next to the file it generates).
@@ -135,6 +158,6 @@ package() {
 
 sha512sums="
 cc12206719afa04a35782061343de705109a8d28257eda08e92f9a8b2ae5f5b55dbcd745e33b42446157bfb9f3db263761c2adb7fb5ccee632403f004c324d07  linux-motorola-fogos-c63a2b5a1b970f8b9a231ea6a536a14bad15eab2.tar.gz
-3eec8b87e64192f622d15a1752d9adc60bed6dd1632b5a544cd7a3819755390f1c373d31b5b9369b65ac6c40ebd70ef3764b8191e94f91ee4b9529ad4cdcbc4a  config-motorola-fogos.aarch64
+c0df507ea446778611a835e893fc45705a29e0377f2cd4dbe0face1c55cf5d64ce537e5f6e65a37d66df08b798f36566b893479464bfe0bb33835b13fccf7f78  config-motorola-fogos.aarch64
 6363ac672d2e37d62f98facc336cfc43260b5d8ceb37be5ee20e0e0cd3630c068b39d645490a4169af389abda35176c966cf77e390cd9403003ca2f8120ffcfa  0001-techpack-camera-use-make-builtins-for-include-dirs.patch
 "

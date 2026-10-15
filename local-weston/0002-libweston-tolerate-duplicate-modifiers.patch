@@ -1,0 +1,37 @@
+From 71f7fedad2b54fc838e81c7184b90d94722bea4c Mon Sep 17 00:00:00 2001
+From: Fogos Porter <fogos@example.com>
+Date: Wed, 14 Oct 2026 11:30:08 +0700
+Subject: [PATCH] libweston: tolerate drivers reporting a modifier twice
+
+---
+ libweston/drm-formats.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/libweston/drm-formats.c b/libweston/drm-formats.c
+index b9afa46..e58201c 100644
+--- a/libweston/drm-formats.c
++++ b/libweston/drm-formats.c
+@@ -436,7 +436,8 @@ err:
+ /**
+  * Add modifier to modifier set of a weston_drm_format.
+  *
+- * Adding repeated modifiers is considered an error.
++ * Adding a repeated modifier is a no-op (some drivers report the same
++ * modifier twice).
+  *
+  * @param format The weston_drm_format that owns the modifier set to which
+  * the modifier should be added
+@@ -449,8 +450,8 @@ weston_drm_format_add_modifier(struct weston_drm_format *format,
+ {
+ 	uint64_t *mod;
+ 
+-	/* We should not try to add repeated modifiers to a set. */
+-	assert(!weston_drm_format_has_modifier(format, modifier));
++	if (weston_drm_format_has_modifier(format, modifier))
++		return 0;
+ 
+ 	mod = wl_array_add(&format->modifiers, sizeof(*mod));
+ 	if (!mod) {
+-- 
+2.55.0
+

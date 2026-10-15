@@ -107,6 +107,21 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
   (7 file); WiFi (`wlan.ko` qca_cld3) + BT (BTFM) firmwarenya **belum ada**
   (tidak di repo TheMuppets; kandidat: paket stock di `tmp/stock/` 4,2GB atau
   `linux-firmware`) + `msm-firmware-loader` sudah di depends device.
+- r6 (14 Okt): +`CONFIG_TMPFS_POSIX_ACL=y` + `TMPFS_XATTR=y` → elogind
+  `Failed to apply ACL` hilang, dmesg bersih ✔ (terverifikasi via SSH).
+- r7 (14 Okt): +`vdd/vcc-supply = <&L9A>` di `ilitek@1` (DT merge) → probe
+  ilitek sukses bila chipone di-modprobe dulu (urutan via
+  `/etc/local.d/touchscreen.start`); `input2`/`event2` + `evtest` +
+  `touchdraw.py` akurat (kalibrasi X 130..2731, Y 153..6235; pitch fb0 2944).
+- r8 (14 Okt): +`CONFIG_QCOM_RMTFS_MEM=y` → `/dev/qcom_rmtfs_uio1` ada;
+  `rmtfs -r -P` jalan (tanpa `-s`: butuh remoteproc-sysfs yang tak ada di
+  downstream); deploy via apk di HP (UUID-safe, tanpa reinstall).
+- r9 (15 Okt, belum dites — HP offline): eksperimen trigger modem via
+  `qcom,pon-depends-on = "modem"` di `pil_lpass` (mekanisme
+  `__subsystem_get()` → boot dependensi dulu saat ADSP di-boot manual) +
+  rebalance ramoops (console 256K→512K untuk trace hang Weston; total tetap
+  0xBF800; WDOG/TZLOG/MMI di bawahnya tak tersentuh). Terverifikasi di DTB:
+  `pon-depends-on`, `console-size 0x80000`, supply ilitek utuh.
 
 ## Hasil test HP (via `fastboot boot`, tanpa flash)
 
@@ -158,19 +173,58 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
    lalu `evtest /dev/input/event2` (atau hexdump) sambil sentuh layar —
    `input3` ILITEK_TDDI terdaftar ~2 mnt setelah modprobe tanpa FW.~~
    SELESAI 13 Okt (lihat "Visual" di bawah); sisa touch: uji sentuh fisik.
-2. **Audio**: node APR/LPASS ikut merge; uji via UCM + speaker (rootfs penuh kini ada).
-3. **WiFi/BT** (`wlan.ko` qca_cld3): `firmware-motorola-fogos` 2-r0 sudah ada tapi
-   **belum** memuat firmware wlan/BT (tidak ada di repo TheMuppets) → gali dari
-   paket stock 4,2GB di `tmp/stock/` atau `linux-firmware`; `msm-firmware-loader`
-   sudah di depends device.
-4. **Modem/data**: pola rhodep (IPA + interconnect SM6375); prioritas belakangan.
+2. **Audio — kartu TERDAFTAR manual, autoload rapuh, bunyi tertunda (13–14 Okt)**:
+   rantai `holi-9370_fs1815-snd-card` di `/proc/asound/cards` TERCAPAI via:
+   ADSP boot manual + `stub_dlkm` (coldplug gagal path) + macro + slave +
+   `q6core` muncul → machine register ✔. TAPI: (a) `audio.start` sempat
+   rusak (`$m` hilang saat escaping → modprobe tanpa argumen; sudah ditulis
+   ulang dari laptop), (b) `rmtfs.start` foreground memblokir `local.d`
+   (touch ikut mati; kini background `&`), (c) speaker-test tetap
+   `ADSP_EFAILED` walau ACDB sudah ditaruh di target/ — q6core device TAK
+   MUNCUL di boot normal (butuh PDR → `pd-mapper`/`qrtr-ns` yang belum ada),
+   (d) UCM + amp aw882xx/fs1815 belum disentuh. Proyek lanjutan:
+   bangun daemon QRTR userspace → q6core → sound → UCM/amp.
+   AWAS (14 Okt): tulis ke `/sys/kernel/boot_adsp/ssr` me-reboot HP —
+   jangan utak-atik SSR ADSP dengan stack termuat.
+3. **WiFi (driver OK, HIF belum attach) + BT (kernel siap) — 13 Okt**: `wlan.ko`
+   qcacld-3.0 TERBUKTI mengandung dukungan QCA6750 + SNOC/iCNSS (strings:
+   `QCA6750`, `hif_snoc_*`, `__icnss_register_driver`); FW `wlanmdsp.mbn` +
+   puluhan `bdwlan.*` hadir via msm-firmware-loader; `icnss2` bound; `wlan.ko`
+   load + `/dev/wlan` ada. Tapi `echo ON > /dev/wlan` memicu `hdd_driver_load`
+   yang macet sunyi (tanpa wlan0, tanpa FW request) — HIF/iCNSS tak pernah
+   attach; kuat dugaan WCN ikut power modem (lihat Modem). BT: `/dev/ttyHS0`
+   ada, `bt_wcn3990` bound ke `bt_power`, `BT_HCIUART_QCA` built-in,
+   FW `apbtfw*.tlv`+`apnv*` tersedia → tinggal attach userspace (BlueZ).
+4. **Modem — FW+stack siap, trigger boot belum ketemu (13–14 Okt)**: `modem.mbn/.mdt`
+   tersaji via msm-firmware-loader; MSS bound ke `subsys-pil-tz`; rmtfs JALAN
+   (`-r -P`, tanpa `-s` yang butuh remoteproc-sysfs tak ada di downstream;
+   butuh kernel r8 `CONFIG_QCOM_RMTFS_MEM` untuk `/dev/qcom_rmtfs_uio1`);
+   qrtr/tqftpserv/soc-qcom-modem terpasang. Tapi modem tak pernah PIL:
+   tak ada auto-boot/ioctl/sysfs-trigger di kernel maupun paket pmOS
+   (`/dev/subsys_modem` hanya SSR, `waiting_for_supplier`=0, `pd-mapper`
+   hanya lookup tak mem-boot, `qrtr-ns`/`peripheral-manager` tak ada di
+    Alpine). Kandidat tersisa: port `peripheral-manager` (pm-service) /
+    teliti init stock (`per_mgr`, `cnd`). Autostart rmtfs dipasang
+    (`/etc/local.d/rmtfs.start`).
+    UPDATE 15 Okt (r9, offline, belum dites): `qcom,pon-depends-on = "modem"`
+    ditambahkan ke `pil_lpass` di DT merge — `__subsystem_get("adsp")`
+    (dipicu manual `echo 1 > /sys/kernel/boot_adsp/boot`, sudah terbukti
+    untuk audio) akan mem-boot modem dulu. Eksperimen reversibel; uji saat
+    HP online: cek `dmesg | grep -i pil` + `qrtr-lookup`.
 5. ~~**Flash permanen**: petakan partisi `super` …~~ SELESAI 13 Okt (lihat atas;
-   `deviceinfo_super_partitions="/dev/sde25"` terpetakan dari sysfs saat backup).
+   `deviceinfo_super_partitions="/dev/disk/by-partlabel/super"` → sde25,
+   device v3-r2).
 6. **Upstream**: rapikan repo `postmarketos-motorola-fogos`, tambah halaman wiki
    (syarat minimal Nura: bisa boot + ada wiki), ajukan MR ke pmaports.
-7. **Stabilitas**: HP reboot sendiri beberapa kali tanpa sebab jelas
-   (`bootreason=watchdog`, wdog-snarl/bark smb5 berulang di dmesg) — selidiki
-   charger-watchdog PM7250B bila mengganggu.
+7. **Stabilitas**: HP reboot beberapa kali. Dua sebab berbeda TELAH
+   diidentifikasi: (a) tombol power dipencet manual saat layar hitam
+   (diakui user — JANGAN saat testing!); (b) SATU kernel panic nyata 14 Okt:
+   `CFI failure` di `power_supply_changed_work` → notifier power_supply
+   dengan pointer sampah (UAF atau signature salah; ilitek & chipone sudah
+   dibersihkan dari daftar tersangka — signature benar & unregister/exit
+   path dicek; `touchscreen_mmi` pun reg/unreg rapi). Butuh frekuensi via
+   `/root/uptime.log` (monitor tiap menit) + jejak pstore bila terulang.
+   Reboot-reboot misterius lain kemungkinan besar (a), bukan kernel.
 
 ## Visual di layar (13 Okt — M3 visual ✔, splash ✔)
 
@@ -184,7 +238,15 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
 - Plymouth + tema `pmos-spin` terpasang (`/etc/plymouth/plymouthd.conf`).
 - Weston 16 gagal di DRM downstream: abort
   `!weston_drm_format_array_find_format` (`drm-formats.c:131`, format ganda
-  dari blob IN_FORMATS msm) — butuh patch weston atau hindari path itu.
+  dari blob IN_FORMATS msm) — TAPI sesudah di-patch (aport lokal
+  `local-weston/`, build OK, terdeploy), weston start → kernel HANG →
+  APSS watchdog reset (`bootreason=watchdog`, tanpa jejak panic; pstore
+  ramoops bawaan overlay terlalu kecil sehingga log crash terpotong).
+   Teori kuat: modeset ATOMIC macet (fbcon pakai path legacy dan selalu OK);
+   weston 16 tampaknya atomic-only. UPDATE 15 Okt (r9, offline): ramoops
+   console 256K→512K (total tetap, region bawah aman) SUDAH di DTB;
+   `drm.debug` tinggal via override cmdline fastboot
+   (`fastboot --cmdline "<cmdline + drm.debug=0x1f>" boot boot.img) tanpa rebuild.
 - Demo pixman murni tanpa compositor: `tmp/fbshow.py` (decode PNG + mmap fb0,
   pitch dibaca via `FBIOGET_FSCREENINFO` — **2944**, bukan 2880; itulah yang
   bikin gambar miring) + `tmp/mksplash.py` → `tmp/splash-fogos-720x1600.png`

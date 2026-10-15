@@ -122,6 +122,12 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
   rebalance ramoops (console 256K→512K untuk trace hang Weston; total tetap
   0xBF800; WDOG/TZLOG/MMI di bawahnya tak tersentuh). Terverifikasi di DTB:
   `pon-depends-on`, `console-size 0x80000`, supply ilitek utuh.
+- r10 (15 Okt, belum dites — HP offline): +`0002-ilitek-charger-notifier-
+  unregister.patch` (tambah flag + unreg notifier + teardown wq di
+  `ili_dev_remove`; perbaiki UAF rmmod → panic CFI). Pelajaran pahit:
+  tulis patch tangan rawan hunk korup (nomor/konteks meleset diam-diam);
+  SELALU generate via `git diff` dari tree teredit + verifikasi
+  `patch --dry-run` pada salinan bersih SEBELUM commit ke aport.
 
 ## Hasil test HP (via `fastboot boot`, tanpa flash)
 

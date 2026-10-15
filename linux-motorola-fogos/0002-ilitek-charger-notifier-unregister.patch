@@ -1,0 +1,73 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fogos Porter <fogos@example.com>
+Date: Thu, 15 Oct 2026 00:00:00 +0000
+Subject: [PATCH] ilitek_v3: unregister charger notifier on remove
+
+ili_dev_remove() frees GPIOs and tears down the esd/bat workqueues but
+never unregisters ilits->notifier_charger (registered in
+ilitek_plat_charger_init()). After rmmod the power_supply notifier chain
+keeps a dangling pointer into freed module memory; the next charger event
+trips Clang CFI and panics the kernel ("CFI failure" in
+power_supply_changed_work, observed live on fogos via pstore):
+
+    <E>CTS-SPIDrv Exit
+    Kernel panic - not syncing: CFI failure (target: 0xffffffd402b5b55c)
+    Workqueue: events power_supply_changed_work
+
+Track registration with a flag (unregistering a never-registered block
+would corrupt the chain, so probe-fail paths stay safe) and also tear
+down the charger workqueue, which was leaked as well.
+
+Signed-off-by: Fogos Porter <fogos@example.com>
+---
+ drivers/input/touchscreen/ilitek_v3_mmi/ilitek_v3.c | 14 ++++++++++++++
+ drivers/input/touchscreen/ilitek_v3_mmi/ilitek_v3.h |  1 +
+ 2 files changed, 15 insertions(+)
+
+diff --git a/drivers/input/touchscreen/ilitek_v3_mmi/ilitek_v3.c b/drivers/input/touchscreen/ilitek_v3_mmi/ilitek_v3.c
+index 1111111..2222222 100644
+--- a/drivers/input/touchscreen/ilitek_v3_mmi/ilitek_v3.c
++++ b/drivers/input/touchscreen/ilitek_v3_mmi/ilitek_v3.c
+@@ -120,6 +120,7 @@ void ilitek_plat_charger_init(void)
+ 		ILI_ERR("power_supply_reg_notifier failed\n");
+ 		return;
+ 	}
++	ilits->charger_notifier_registered = true;
+ 
+ 	/* if power supply supplier registered brfore TP
+ 	* ps_notify_callback will not receive PSY_EVENT_PROP_ADDED
+@@ -1712,6 +1713,20 @@ void ili_dev_remove(bool flag)
+ 		flush_workqueue(bat_wq);
+ 		destroy_workqueue(bat_wq);
+ 	}
++#if CHARGER_NOTIFIER_CALLBACK
++#if KERNEL_VERSION(4, 1, 0) <= LINUX_VERSION_CODE
++	if (ilits->charger_notifier_registered) {
++		power_supply_unreg_notifier(&ilits->notifier_charger);
++		ilits->charger_notifier_registered = false;
++	}
++	if (ilits->charger_notify_wq != NULL) {
++		cancel_work_sync(&ilits->update_charger);
++		flush_workqueue(ilits->charger_notify_wq);
++		destroy_workqueue(ilits->charger_notify_wq);
++		ilits->charger_notify_wq = NULL;
++	}
++#endif
++#endif
+ 
+ 	if (ilits->ws)
+ 		PM_WAKEUP_UNREGISTER(ilits->ws);
+diff --git a/drivers/input/touchscreen/ilitek_v3_mmi/ilitek_v3.h b/drivers/input/touchscreen/ilitek_v3_mmi/ilitek_v3.h
+index 1111111..2222222 100644
+--- a/drivers/input/touchscreen/ilitek_v3_mmi/ilitek_v3.h
++++ b/drivers/input/touchscreen/ilitek_v3_mmi/ilitek_v3.h
+@@ -1159,6 +1159,7 @@ struct ilitek_ts_data {
+ #if KERNEL_VERSION(4, 1, 0) <= LINUX_VERSION_CODE
+ /* add_for_charger_start */
+ 	struct notifier_block notifier_charger;
++	bool charger_notifier_registered;
+ 	struct workqueue_struct *charger_notify_wq;
+ 	struct work_struct	update_charger;
+ 	int usb_plug_status;
+-- 
+2.56.0

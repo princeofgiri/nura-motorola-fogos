@@ -6,7 +6,7 @@
 maintainer="Fogos Porter <fogos@example.com>"
 pkgname=linux-motorola-fogos
 pkgver=5.4.302
-pkgrel=9
+pkgrel=10
 pkgdesc="Motorola Moto G34 5G (fogos) downstream kernel"
 arch="aarch64"
 _carch="arm64"
@@ -47,6 +47,7 @@ source="
 	$pkgname-$_commit.tar.gz::https://github.com/LineageOS/$_repository/archive/$_commit.tar.gz
 	$_config
 	0001-techpack-camera-use-make-builtins-for-include-dirs.patch
+	0002-ilitek-charger-notifier-unregister.patch
 "
 
 builddir="$srcdir/$_repository-$_commit"
@@ -160,4 +161,5 @@ sha512sums="
 cc12206719afa04a35782061343de705109a8d28257eda08e92f9a8b2ae5f5b55dbcd745e33b42446157bfb9f3db263761c2adb7fb5ccee632403f004c324d07  linux-motorola-fogos-c63a2b5a1b970f8b9a231ea6a536a14bad15eab2.tar.gz
 c0df507ea446778611a835e893fc45705a29e0377f2cd4dbe0face1c55cf5d64ce537e5f6e65a37d66df08b798f36566b893479464bfe0bb33835b13fccf7f78  config-motorola-fogos.aarch64
 6363ac672d2e37d62f98facc336cfc43260b5d8ceb37be5ee20e0e0cd3630c068b39d645490a4169af389abda35176c966cf77e390cd9403003ca2f8120ffcfa  0001-techpack-camera-use-make-builtins-for-include-dirs.patch
+a4ce247e7c3e204e6ff97d860449cda0aa6c00cc2129a990ce74e908cc8ee20bc0236e06daf16ce66e7a20ec66744f1ed01c9d3a318cc0122372292ade3794f2  0002-ilitek-charger-notifier-unregister.patch
 "

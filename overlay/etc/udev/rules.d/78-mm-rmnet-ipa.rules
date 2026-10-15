@@ -1,0 +1,1 @@
+ACTION=="add|change", SUBSYSTEM=="net", KERNEL=="rmnet_ipa*", ENV{ID_MM_QCOM_SOC}="1", ENV{ID_MM_PHYSDEV_UID}="qcom-soc", ENV{ID_MM_CANDIDATE}="1"

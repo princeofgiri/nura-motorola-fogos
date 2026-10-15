@@ -25,10 +25,12 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
       Optimasi UI: panel diturunkan ke 60Hz (`720x1600@60Hz`), multi-threaded LLVMpipe
       `LP_NUM_THREADS=8` + `QSG_RENDER_LOOP=threaded`, efek berat (blur, contrast, translucency)
       dimatikan untuk menjaga responsivitas CPU software rasterizer.
-- [x] **Modem Subsystem ONLINE (15 Okt)**: Hook DTB `qcom,pon-depends-on = "modem"` di `pil_lpass`
-      sukses memicu PIL subsystem modem. QRTR Node 0 aktif dengan layanan QMI lengkap
-      (Voice, SMS, Data, UIM), interface `rmnet_ipa0` hadir otomatis, `pd-mapper` aktif.
-- [ ] Berikutnya: audio internal, WiFi/BT userspace attachment, kamera.
+- [x] **M5 — Modem & SIM Card Terdeteksi (15 Okt)**:
+      - ModemManager mendeteksi perangkat Qualcomm SoC (`/org/freedesktop/ModemManager1/Modem/0`), terikat ke `qrtr0` (qmi) dan `rmnet_ipa0` (net).
+      - Bug DSDS ModemManager (slot 2 kosong menimpa slot 1 aktif) berhasil diatasi via shim library `libmm-slot-fix.so` (`LD_PRELOAD`).
+      - SIM fisik di Slot 1 terdeteksi sempurna: ICCID `8962100048909141989`, IMSI `510104890914198`, Operator ID `51010` (Telkomsel Indonesia).
+      - Modem bertransisi ke status `state: enabled`, `power state: on`, registration `idle`.
+- [ ] Berikutnya: Network registration attach, mobile data rmnet_ipa0, audio internal, Wi-Fi.
 
 ## File port (kanonis, di `~/nura-fogos/`)
 

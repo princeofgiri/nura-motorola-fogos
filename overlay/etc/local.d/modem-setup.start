@@ -1,0 +1,19 @@
+#!/bin/sh
+# Setup FSG and carrier MBN symlinks
+mkdir -p /mnt/fsg /vendor/fsg /readonly/vendor/fsg /lib/firmware/fsg
+mount -t ext4 -o ro /dev/sdd13 /mnt/fsg 2>/dev/null || true
+mount --bind /mnt/fsg /vendor/fsg 2>/dev/null || true
+mount --bind /mnt/fsg /readonly/vendor/fsg 2>/dev/null || true
+mount --bind /mnt/fsg /lib/firmware/fsg 2>/dev/null || true
+
+# Setup disk partlabel symlinks for rmtfs
+ln -sf /dev/disk/by-partlabel/fsg_a /dev/disk/by-partlabel/modem_fsg 2>/dev/null || true
+ln -sf /dev/disk/by-partlabel/fsc /dev/disk/by-partlabel/modem_fsc 2>/dev/null || true
+ln -sf /dev/disk/by-partlabel/modemst1 /dev/disk/by-partlabel/modem_fs1 2>/dev/null || true
+ln -sf /dev/disk/by-partlabel/modemst2 /dev/disk/by-partlabel/modem_fs2 2>/dev/null || true
+
+# Setup tqftpserv firmware links
+mkdir -p /firmware /readonly/firmware /readonly/vendor/firmware_mnt
+ln -sf /run/msm-firmware-loader/mnt/modem_a/image /firmware/image 2>/dev/null || true
+ln -sf /run/msm-firmware-loader/mnt/modem_a/image /readonly/firmware/image 2>/dev/null || true
+ln -sf /run/msm-firmware-loader/mnt/modem_a/image /readonly/vendor/firmware_mnt/image 2>/dev/null || true

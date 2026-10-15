@@ -14,16 +14,21 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
 - [x] **M3 — Konsol teks di layar (sisi kernel)**: `Console: switching to colour
       frame buffer device 90x100`, `fb0: msm_drmdrmfb`, vtcon framebuffer `bind=1`,
       fb0 720x1600x32 (tes 13 Okt, r5). Tinggal konfirmasi visual di layar HP.
-- [x] **Touchscreen ✔ SEMPURNA (13 Okt)**: driver ilitek butuh `vdd/vcc-supply`
-  → kernel r7 (+supply `&L9A` di DT merge; chipone tanpa regulator-consumer,
-  nodenya disentuh); probe ilitek hanya sukses bila chipone di-modprobe dulu
-  (urutan deterministik via `/etc/local.d/touchscreen.start`, auto tiap boot →
-  `input2`/`event2` hadir sendiri); `evtest` + visualizer `touchdraw.py`
-  (kini di `/usr/local/bin` di HP + kanonis di `tmp/`) membuktikan sentuh+
-  geser akurat setelah 3 bug tool diperbaiki (duplikat ST+MT, buffer event
-  terbelah, `mtx = mty = {}` satu dict!). Kalibrasi: area aktif X 130..2731,
-  Y 153..6235.
-- [ ] Berikutnya: audio, WiFi/BT, modem (IPA), kamera, flash permanen rootfs.
+- [x] **Touchscreen ✔ SEMPURNA (13-15 Okt)**: driver ilitek probe deterministik
+      via `/etc/local.d/touchscreen.start`. Di Wayland/Plasma Mobile, sempat tidak merespons
+      karena `libudev-zero` salah mengklasifikasikan sebagai touchpad gagal uji sanity.
+      Setelah ditukar ke `eudev-libs` + udev rule 99-touchscreen (`MODE=0666`) +
+      quirk `-BTN_TOOL_FINGER`, touchscreen 10-point multitouch (`keyboard touch`)
+      berjalan 100% responsif di UI Plasma Mobile.
+- [x] **M4 — Graphical UI Plasma Mobile (15 Okt)**: `postmarketos-ui-plasma-mobile`
+      berjalan di KWin Wayland menggunakan mode Legacy KMS (`KWIN_DRM_NO_AMS=1`).
+      Optimasi UI: panel diturunkan ke 60Hz (`720x1600@60Hz`), multi-threaded LLVMpipe
+      `LP_NUM_THREADS=8` + `QSG_RENDER_LOOP=threaded`, efek berat (blur, contrast, translucency)
+      dimatikan untuk menjaga responsivitas CPU software rasterizer.
+- [x] **Modem Subsystem ONLINE (15 Okt)**: Hook DTB `qcom,pon-depends-on = "modem"` di `pil_lpass`
+      sukses memicu PIL subsystem modem. QRTR Node 0 aktif dengan layanan QMI lengkap
+      (Voice, SMS, Data, UIM), interface `rmnet_ipa0` hadir otomatis, `pd-mapper` aktif.
+- [ ] Berikutnya: audio internal, WiFi/BT userspace attachment, kamera.
 
 ## File port (kanonis, di `~/nura-fogos/`)
 

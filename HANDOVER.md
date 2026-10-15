@@ -6,9 +6,12 @@ Ditulis 15 Okt 2026. Detail harian ada di `PROGRES.md` (bagian Indonesia).
 ## 1. TL;DR
 
 - Target: Nura OS (= postmarketOS, tooling identik `pmbootstrap` + `pmaports`) di **Moto G34 5G (fogos, XT2363-9, SM6375 Snapdragon 695)**, kernel downstream 5.4 LineageOS.
-- Status: **boot permanen + display + konsol + touch ✔** (terverifikasi di HP). Audio kartu terdaftar tapi belum bunyi. WiFi/BT/modem tertunda. Weston jalan tapi output tak sampai panel + kadang mati diam-diam.
-- Kernel kanonis: **5.4.302-r10 sudah BUILD** (ada apk-nya) tapi **belum diinstal** — HP masih jalan **r8** (`#9-postmarketOS`). Langkah pertama sesi berikut: install r10 → reboot → uji trigger modem.
-- HP **online saat dokumen ini ditulis** (uptime menit, `#9`, ping OK).
+- Status: **boot permanen + display + Plasma Mobile GUI + touch 10-point multitouch + Modem ONLINE ✔** (terverifikasi di HP).
+- Kernel aktif: **5.4.302-r10 (`#11-postmarketOS`)** terpasang dan boot sempurna. Patch 0002 CFI panic fix aktif.
+- Modem Qualcomm Hexagon (MSS) ONLINE via QRTR Node 0, `rmnet_ipa0` up, `pd-mapper` running.
+- GUI Plasma Mobile 6.7.5 berjalan di KWin Wayland menggunakan mode Legacy KMS (`KWIN_DRM_NO_AMS=1`).
+- Touchscreen ILITEK_TDDI aktif via eudev-libs + udev 0666 + libinput quirk. Mode tablet aktif di kwinrc.
+- Optimasi performa: Display 60Hz (`720x1600@60Hz`), multi-threaded LLVMpipe (`LP_NUM_THREADS=8`), shader berat dimatikan.
 
 ## 2. Perangkat, mesin, akses
 
@@ -56,14 +59,12 @@ Ditulis 15 Okt 2026. Detail harian ada di `PROGRES.md` (bagian Indonesia).
 10. `deviceinfo_getty ttyMSM0` tapi driver serial mati → komentar baris `ttyMSM0` di `/etc/inittab` (sementara).
 
 ## 6. Status kini + langkah berikut (berurutan)
-
-Kondisi: HP online, kernel **r8**, rootfs openrc, SSH OK. **r10 sudah build, BELUM diinstal.**
-1. **Install r10** (`scp` apk r10 → `apk add --allow-untrusted` di HP — UUID-safe, tanpa reinstall) → reboot → verifikasi `uname -v #11`.
-2. **Tes trigger modem**: `echo 1 > /sys/kernel/boot_adsp/boot` → `dmesg | grep -i pil` + `qrtr-lookup` (apakah modem PIL ikut naik via pon-depends-on).
-3. **Tes rmmod ilitek aman** (seharusnya tak panic lagi berkat 0002) — opsional, hati-hati.
-4. **Debug hang Weston/atomic**: `echo 0x1f > /sys/module/drm/parameters/debug`, stream `dmesg -w` ke laptop, start weston; catat fungsi macet. Fakta: atomic commit "complete" tapi panel tak update; legacy setcrtc (script `tmp/drmtest.py`) juga OK-tapi-tak-tampil; hanya tulis langsung ke fb0 (fbshow) yang tampil. Ramoops sudah dibesarkan di r9 (console 512K) untuk tangkap trace.
-5. Audio: bangun daemon QRTR (`pd-mapper`/`qrtr-ns` — tak ada di Alpine; sumber `linux-msm/*`, github sempat diblokir) → q6core → sound → UCM/amp.
-6. Upstream: repo sudah push; wiki + MR pmaports menyusul.
+ 
+Kondisi: HP online, kernel **r10 (#11-postmarketOS)**, Plasma Mobile 6.7.5 GUI aktif + touch OK.
+1. **Audio internal (speaker/mic)**: rute audio via ADSP/HiFi4, UCM config, amp aw882xx/fs1815.
+2. **WiFi & Bluetooth userspace**: modul `wlan.ko` terpasang (`/dev/wlan`), selidiki HIF attach ke wlan0 via WCN; pasang BlueZ untuk BT di `/dev/ttyHS0`.
+3. **Hardware GPU 3D acceleration**: eksplorasi Turnip KGSL backend atau Zink di atas KGSL agar render tidak 100% di CPU llvmpipe.
+4. **Upstream MR**: rapikan aport `device-motorola-fogos` dan ajukan MR ke pmaports.
 
 ## 7. Perintah penting
 

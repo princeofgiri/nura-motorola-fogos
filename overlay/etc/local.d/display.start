@@ -1,0 +1,3 @@
+#!/bin/sh
+# Unbind fbcon so Wayland compositor takes DRM master cleanly
+echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true

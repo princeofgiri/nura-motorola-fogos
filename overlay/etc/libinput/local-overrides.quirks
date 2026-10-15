@@ -1,0 +1,3 @@
+[Motorola Fogos Touchscreen]
+MatchName=ILITEK_TDDI
+AttrEventCode=-BTN_TOOL_FINGER;

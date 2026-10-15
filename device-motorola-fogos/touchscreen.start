@@ -1,0 +1,5 @@
+#!/bin/sh
+# fogos: ilitek probe only succeeds after chipone touched the shared bus
+modprobe chipone_tddi_v2_mmi
+sleep 5
+modprobe ilitek_v3_mmi

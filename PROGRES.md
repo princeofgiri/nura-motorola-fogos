@@ -30,16 +30,23 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
       - Bug DSDS ModemManager (slot 2 kosong menimpa slot 1 aktif) berhasil diatasi via shim library `libmm-slot-fix.so` (`LD_PRELOAD`).
       - SIM fisik di Slot 1 terdeteksi sempurna: ICCID `8962100048909141989`, IMSI `510104890914198`, Operator ID `51010` (Telkomsel Indonesia).
       - Modem bertransisi ke status `state: enabled`, `power state: on`, registration `idle`.
+- [x] **M6 — Packaging & KWin Legacy KMS DRM Layer Fix (15 Okt)**:
+      - Seluruh perbaikan live (`libqrtr-fix.so`, `libmm-slot-fix.so`, udev rules, local.d autostart, conf.d) dikemas resmi ke paket `device-motorola-fogos` (pkgver=3-r3).
+      - Build APK sukses via `pmbootstrap build device-motorola-fogos --arch aarch64` (`device-motorola-fogos-3-r3.apk`).
+      - Solusi layar blank hitam / KWin `Failed to find a working output layer configuration`:
+        1. `display.start` wajib executable (`chmod 0755`) agar OpenRC menjalankan unbind `fbcon` (`echo 0 > /sys/class/vtconsole/vtcon1/bind`), melepaskan DRM master lock.
+        2. Set integer scaling `"scale": 2.0` di `kwinoutputconfig.json` menghilangkan bug presisi floating point `1600.2` (`precision lost!`).
+        3. Menambahkan `KWIN_DISABLE_OVERLAYS=1` dan `KWIN_DRM_PREFER_COLOR_DEPTH=24` agar KWin tidak mencoba hardware overlay planes yang tidak didukung downstream Legacy KMS.
 - [ ] Berikutnya: Network registration attach, mobile data rmnet_ipa0, audio internal, Wi-Fi.
 
 ## File port (kanonis, di `~/nura-fogos/`)
 
-- `device-motorola-fogos/` (pkgver=3-r1): `deviceinfo` (header v2, pagesize 4096,
-  dtb `vendor/qcom/blair-moto-fogos-pmos` + `append_dtb` + `flash_kernel_on_update`,
-  `drm`, `getty` ttyMSM0, layar 720x1600, `boot_filesystem` fat32, cmdline qcom +
-  `androidboot.hab.product=fogos`, dtbo kosong 25165824 byte), `kernel-cmdline.conf`
-  (`earlycon`, HACK wajib ABL), `modules-initfs` (touchscreen `chipone_tddi_v2_mmi`
-  + `ilitek_v3_mmi`, dual-source panel; otomatis jadi `initramfs.load` via devicepkg).
+- `device-motorola-fogos/` (pkgver=3-r3): `deviceinfo`, `kernel-cmdline.conf`,
+  `modules-initfs`, `libqrtr-fix.c` (shim QRTR service publication instance APSS),
+  `libmm-slot-fix.c` (shim DSDS ModemManager), conf.d OpenRC (`pd-mapper`, `tqftpserv`,
+  `rmtfs`, `modemmanager`), udev rules (`99-touchscreen`, `78-mm-rmnet-ipa`, libinput quirks),
+  dan autostart local.d (`display.start`, `touchscreen.start`, `rmtfs.start`, `modem-setup.start`,
+  `net-route.start`). Built & verified via pmbootstrap.
 - `linux-motorola-fogos/`: `APKBUILD` (5.4.302-r5, source LineageOS commit `c63a2b5a`,
   pola `linux-xiaomi-monet` + clang/LLVM), `config-motorola-fogos.aarch64` (862 opsi:
   gabungan `holi-qgki_defconfig` + `lineage_moto-holi.config` + `moto-holi-fogos.config`

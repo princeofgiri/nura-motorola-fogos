@@ -10,10 +10,11 @@ maintainer="Fogos Porter <fogos@example.com>"
 pkgname=device-motorola-fogos
 pkgdesc="Motorola Moto G34 5G"
 pkgver=3
-pkgrel=3
+pkgrel=5
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
+replaces="postmarketos-base-ui-modemmanager-openrc"
 options="!check !archcheck"
 depends="
 	linux-motorola-fogos
@@ -23,6 +24,8 @@ depends="
 	postmarketos-base
 	soc-qcom
 	eudev-libs
+	python3
+	unzip
 "
 makedepends="
 	devicepkg-dev
@@ -52,6 +55,11 @@ source="
 	78-mm-rmnet-ipa.rules
 	local-overrides.quirks
 	00-kwin.sh
+	99-fogos-power.conf
+	android-log-catcher.c
+	fogos-patch.py
+	wifi-prepare.sh
+	fogos-wifi.initd
 "
 
 build() {
@@ -68,6 +76,9 @@ build() {
 	# Build libmm-slot-fix.so
 	${CC:-gcc} $CFLAGS $CPPFLAGS $LDFLAGS -shared -fPIC -o "$srcdir/libmm-slot-fix.so" "$srcdir/libmm-slot-fix.c" \
 		$(pkg-config --cflags --libs qmi-glib) -ldl
+
+	# Build android-log-catcher
+	${CC:-gcc} $CFLAGS $CPPFLAGS $LDFLAGS -O2 -o "$srcdir/android-log-catcher" "$srcdir/android-log-catcher.c"
 }
 
 package() {
@@ -100,6 +111,15 @@ package() {
 	# Wayland / KWin display environment
 	install -Dm755 "$srcdir/00-kwin.sh" "$pkgdir/etc/tinydm.d/env-wayland.d/00-kwin.sh"
 	install -Dm755 "$srcdir/00-kwin.sh" "$pkgdir/etc/profile.d/kwin-drm.sh"
+
+	# Elogind power configuration (prevent screen sleep crash)
+	install -Dm644 "$srcdir/99-fogos-power.conf" "$pkgdir/etc/elogind/logind.conf.d/99-fogos-power.conf"
+
+	# Wi-Fi daemons, shims, and service
+	install -Dm755 "$srcdir/android-log-catcher" "$pkgdir/usr/bin/android-log-catcher"
+	install -Dm755 "$srcdir/fogos-patch.py" "$pkgdir/usr/lib/fogos-patch.py"
+	install -Dm755 "$srcdir/wifi-prepare.sh" "$pkgdir/usr/share/fogos/wifi-prepare.sh"
+	install -Dm755 "$srcdir/fogos-wifi.initd" "$pkgdir/etc/init.d/fogos-wifi"
 }
 sha512sums="
 a891d10d667ac23e821f45b63b3f592198beb18c2d9b220b05f053f1081939149e52bd9dd801562aa533d1de619b38cf23fbe9426c74024f6ed1fcdc0608da89  deviceinfo
@@ -114,10 +134,11 @@ b579f3adc6f074b78c2cdc900cfc64fdb4b06f7b9c0fc083e25bf68b2a1796a7b8ff0a7298f679a0
 cd4792f985fe2a7408a893f002f8b2b6b03ac2325d6d550d22fe613b54cde5d8c8aab18a033b930af82b2f300530a8607dbc6db4451def20d2ef0779510a996d  display.start
 72a9d9c59099023c15e1e29014c2fcb35d59b81d1441708e6339f4361df7587968c8b308e2a42b6139ceb3697732a2aa5df290ae2d3d3ce1b111ab15576cb509  touchscreen.start
 bf76bbcf8e78c815e249320c179040e802eb24a566d93a0b99044e342517e41d8edcb5362627f2b221042249b2dab01ef5f927c2bcd2849e882de78982baf10b  rmtfs.start
-cf6c2662f16579b9f4deb746907e76c678304e15e785e0e64052461c0a5d017d5cd8b3a1e00a1a4603c796c82d76b2f7b82aef59e7c64509e9dab03154ae519d  modem-setup.start
+9c3eb0d9ec99d4809f4e5c47019976cb2a07a8682f5ba2d4e0e89e45dadb0f245c4652f49573095cd007ddae5903b4187ee55b3eb6042b23512b25c2befa2dae  modem-setup.start
 253de0a2a22b752ee16224f6364bc19d54e2135dbfec2996c7d0c07cc60506d0e51d73149ef82114d3dec2562ae9d15c96b8e649274cba6ba464741b851c8f35  net-route.start
 1972aa4b386f883f099dfd85f9b12ca4f14b2db23e54abd7ba7c5c069c2272d3c29acde2362a335f2f29124343b7ab4b2f897be3e65948efdf35cdbbef9dc419  99-touchscreen.rules
 e19de4a8de5d58e51f9028506ca95100d4f672fd80d36c3641f246250e2ffafb6f643a564f61cc7dcf6e731befad0f15676aef7eaadef8f66515871fab7da9fd  78-mm-rmnet-ipa.rules
 d7d386a254cbd858d90a69c93f8be85da4dd3412619fe92b20cf4356cb88e3c9ace7ad8020e76e7ed480d06a722d04999a4a97befc51ebe33f5a24405721ecb0  local-overrides.quirks
 d484a043907189a302b1d07f984af68e0b26e0a2b2a74b096646ff5107e634acca41c7362b0388ed0183011ec02252f4c8a5e0f39182df9085620682f325b72a  00-kwin.sh
+8ad7c4683177218d8005402336260cdfc23d5ff958a7ee19e44f34036f9f18559db3588f572093dd85f5ecf8335696d3c457bf297b361adf6497ecd741069445  99-fogos-power.conf
 "

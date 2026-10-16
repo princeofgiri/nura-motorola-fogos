@@ -33,11 +33,19 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
 - [x] **M6 — Packaging & KWin Legacy KMS DRM Layer Fix (15 Okt)**:
       - Seluruh perbaikan live (`libqrtr-fix.so`, `libmm-slot-fix.so`, udev rules, local.d autostart, conf.d) dikemas resmi ke paket `device-motorola-fogos` (pkgver=3-r3).
       - Build APK sukses via `pmbootstrap build device-motorola-fogos --arch aarch64` (`device-motorola-fogos-3-r3.apk`).
-      - Solusi layar blank hitam / KWin `Failed to find a working output layer configuration`:
-        1. `display.start` wajib executable (`chmod 0755`) agar OpenRC menjalankan unbind `fbcon` (`echo 0 > /sys/class/vtconsole/vtcon1/bind`), melepaskan DRM master lock.
-        2. Set integer scaling `"scale": 2.0` di `kwinoutputconfig.json` menghilangkan bug presisi floating point `1600.2` (`precision lost!`).
-        3. Menambahkan `KWIN_DISABLE_OVERLAYS=1` dan `KWIN_DRM_PREFER_COLOR_DEPTH=24` agar KWin tidak mencoba hardware overlay planes yang tidak didukung downstream Legacy KMS.
-- [ ] Berikutnya: Network registration attach, mobile data rmnet_ipa0, audio internal, Wi-Fi.
+- [x] **Screen Sleep & Power Crash Resolved (16 Okt)**:
+      - Layar sleep memicu reboot karena register access downstream SDE pada saat DPMS off.
+      - DPMS turn-off dinonaktifkan di `powerdevilrc`, `kglobalshortcutsrc`, dan `/etc/elogind/logind.conf.d/99-fogos-power.conf`. Device UI tetap aktif dan stabil tanpa reboot.
+- [x] **M7 — Wi-Fi WCN3990 & Dual-Band 2.4/5GHz Scanning ✔ SEMPURNA (16 Okt)**:
+      - Driver Qualcomm WCN3990 (`qcacld-3.0` / `wlan.ko` + `icnss2`) membutuhkan userspace daemon `cnss-daemon` untuk melakukan handshake QMI, penyediaan MAC address, dan inisialisasi kalibrasi sebelum WLAN firmware menerbitkan event `FW_READY`.
+      - Loop mount partisi stock vendor (`/mnt/stock_vendor`) dan stock system (`/mnt/stock_system`) dari partisi `super` (`/dev/sde25`) secara read-only.
+      - Android runtime APEX diekstrak untuk menyediakan Bionic libc dan dynamic linker 64-bit (`linker64`).
+      - Android `binderfs` dimount di `/dev/binderfs` dengan node `/dev/binder` dan `/dev/vndbinder`.
+      - Bionic WaitForProperty and SELinux checks pada daemon vendor di-bypass secara dinamis (`fogos-patch.py`).
+      - Stack daemon Android vendor (`vndservicemanager`, `pm-service`, `pm-proxy`, `cnss-daemon`) berhasil berjalan sepenuhnya secara native di postmarketOS.
+      - `wlan0` terdaftar secara native di kernel dan NetworkManager, mendukung pemindaian dual-band 2.4GHz dan 5GHz (terdeteksi puluhan AP dengan sinyal penuh dan kecepatan hingga 1170 Mbit/s).
+      - Seluruh stack dikemas ke dalam OpenRC service `fogos-wifi` di `device-motorola-fogos` (pkgver=3-r5).
+- [ ] Berikutnya: Network registration attach, mobile data rmnet_ipa0, audio internal.
 
 ## File port (kanonis, di `~/nura-fogos/`)
 

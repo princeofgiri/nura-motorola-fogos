@@ -1,30 +1,48 @@
 #!/bin/sh
-# Setup FSG and carrier MBN symlinks
-mkdir -p /mnt/fsg /vendor/fsg /readonly/vendor/fsg /lib/firmware/fsg
-mount -t ext4 -o ro /dev/sdd13 /mnt/fsg 2>/dev/null || true
-mount --bind /mnt/fsg /vendor/fsg 2>/dev/null || true
-mount --bind /mnt/fsg /readonly/vendor/fsg 2>/dev/null || true
-mount --bind /mnt/fsg /lib/firmware/fsg 2>/dev/null || true
+# Get current slot
+SLOT=$(cat /proc/cmdline | grep -o 'androidboot.slot_suffix=_[ab]' | cut -d= -f2)
+[ -z "$SLOT" ] && SLOT="_b"
 
-# Setup disk partlabel symlinks for rmtfs
-ln -sf /dev/disk/by-partlabel/fsg_a /dev/disk/by-partlabel/modem_fsg 2>/dev/null || true
+# Setup FSG and carrier MBN symlinks
+FSG_DEV="/dev/disk/by-partlabel/fsg${SLOT}"
+[ -e "$FSG_DEV" ] || FSG_DEV="/dev/disk/by-partlabel/fsg_a"
+ln -sf "$FSG_DEV" /dev/disk/by-partlabel/modem_fsg 2>/dev/null || true
 ln -sf /dev/disk/by-partlabel/fsc /dev/disk/by-partlabel/modem_fsc 2>/dev/null || true
 ln -sf /dev/disk/by-partlabel/modemst1 /dev/disk/by-partlabel/modem_fs1 2>/dev/null || true
 ln -sf /dev/disk/by-partlabel/modemst2 /dev/disk/by-partlabel/modem_fs2 2>/dev/null || true
 
+mkdir -p /mnt/fsg /vendor/fsg /readonly/vendor/fsg /lib/firmware/fsg
+mount -t ext4 -o ro "$FSG_DEV" /mnt/fsg 2>/dev/null || true
+mount --bind /mnt/fsg /vendor/fsg 2>/dev/null || true
+mount --bind /mnt/fsg /readonly/vendor/fsg 2>/dev/null || true
+mount --bind /mnt/fsg /lib/firmware/fsg 2>/dev/null || true
+
 # Setup tqftpserv firmware links
-mkdir -p /firmware /readonly/firmware /readonly/vendor/firmware_mnt
-ln -sf /run/msm-firmware-loader/mnt/modem_a/image /firmware/image 2>/dev/null || true
-ln -sf /run/msm-firmware-loader/mnt/modem_a/image /readonly/firmware/image 2>/dev/null || true
-ln -sf /run/msm-firmware-loader/mnt/modem_a/image /readonly/vendor/firmware_mnt/image 2>/dev/null || true
+MODEM_DIR="/run/msm-firmware-loader/mnt/modem${SLOT}"
+[ -d "$MODEM_DIR/image" ] || MODEM_DIR=$(ls -d /run/msm-firmware-loader/mnt/modem_* 2>/dev/null | head -n1)
+
+if [ -n "$MODEM_DIR" ] && [ -d "$MODEM_DIR/image" ]; then
+    mkdir -p /firmware /readonly/firmware /readonly/vendor/firmware_mnt /var/lib/tqftpserv
+    ln -sfn "$MODEM_DIR/image" /firmware/image
+    ln -sfn "$MODEM_DIR/image" /readonly/firmware/image
+    ln -sfn "$MODEM_DIR/image" /readonly/vendor/firmware_mnt/image
+    cp -n "$MODEM_DIR/image"/*.jsn /lib/firmware/ 2>/dev/null || true
+    ln -sf /lib/firmware/wlanmdsp.mbn /var/lib/tqftpserv/ 2>/dev/null || true
+fi
 
 # Setup ModemManager wrapper diversion if needed
 if [ -f /usr/sbin/ModemManager ] && [ ! -L /usr/sbin/ModemManager ] && ! grep -q "LD_PRELOAD" /usr/sbin/ModemManager 2>/dev/null; then
     mv /usr/sbin/ModemManager /usr/sbin/ModemManager.real
-    cat << 'EOF' > /usr/sbin/ModemManager
+    cat << 'MMEOF' > /usr/sbin/ModemManager
 #!/bin/sh
 export LD_PRELOAD=/usr/lib/libmm-slot-fix.so
 exec /usr/sbin/ModemManager.real "$@"
-EOF
+MMEOF
     chmod +x /usr/sbin/ModemManager
 fi
+
+# Boot ADSP and Modem
+echo 1 > /sys/kernel/boot_adsp/boot 2>/dev/null || true
+
+# Pre-load WLAN kernel module
+modprobe wlan 2>/dev/null || true

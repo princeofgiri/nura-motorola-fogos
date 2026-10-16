@@ -1,1 +1,6 @@
 export LD_PRELOAD="/usr/lib/libqrtr-fix.so"
+start_pre() {
+    mkdir -p /tmp/fake_remoteproc/remoteproc0
+    echo 'wlanmdsp.mbn' > /tmp/fake_remoteproc/remoteproc0/firmware
+    mount --bind /tmp/fake_remoteproc /sys/class/remoteproc 2>/dev/null || true
+}

@@ -60,11 +60,12 @@ Ditulis 15 Okt 2026. Detail harian ada di `PROGRES.md` (bagian Indonesia).
 
 ## 6. Status kini + langkah berikut (berurutan)
  
-Kondisi: HP online, kernel **r10 (#11-postmarketOS)**, Plasma Mobile 6.7.5 GUI aktif + touch OK.
-1. **Audio internal (speaker/mic)**: rute audio via ADSP/HiFi4, UCM config, amp aw882xx/fs1815.
-2. **WiFi & Bluetooth userspace**: modul `wlan.ko` terpasang (`/dev/wlan`), selidiki HIF attach ke wlan0 via WCN; pasang BlueZ untuk BT di `/dev/ttyHS0`.
-3. **Hardware GPU 3D acceleration**: eksplorasi Turnip KGSL backend atau Zink di atas KGSL agar render tidak 100% di CPU llvmpipe.
-4. **Upstream MR**: rapikan aport `device-motorola-fogos` dan ajukan MR ke pmaports.
+Kondisi: HP online, kernel **r10 (#11-postmarketOS)**, Plasma Mobile 6.7.5 GUI aktif + touch OK + **Wi-Fi wlan0 aktif & dual-band scan 100% OK**.
+1. **Mobile Data (rmnet_ipa0)**: registrasi jaringan seluler dan koneksi data 4G/5G.
+2. **Audio internal (speaker/mic)**: rute audio via ADSP/HiFi4, UCM config, amp aw882xx/fs1815.
+3. **Bluetooth userspace**: BlueZ di `/dev/ttyHS0` (`bt_wcn3990`).
+4. **Hardware GPU 3D acceleration**: eksplorasi Turnip KGSL backend atau Zink di atas KGSL agar render tidak 100% di CPU llvmpipe.
+5. **Upstream MR**: rapikan aport `device-motorola-fogos` dan ajukan MR ke pmaports.
 
 ## 7. Perintah penting
 
@@ -76,10 +77,13 @@ fastboot --cmdline "<cmdline + pmos.debug-shell>" boot boot.img  # paksa shell i
 python3 + socket TCP 172.16.42.1:23               # debug shell (tanpa nc)
 ```
 
-## 8. Pertanyaan terbuka (belum terjawab)
+## 8. Catatan Arsitektur Wi-Fi WCN3990 di Nura OS / postmarketOS
 
-- Fungsi mana yang macet saat modeset atomic weston (butuh trace `drm.debug`)?
-- Apakah `pon-depends-on=modem` benar mem-boot modem (uji r10)?
-- Dari mana mem-boot modem secara resmi (per_mgr/cnd stock) bila eksperimen gagal?
-- Sumber `qrtr-ns`/`peripheral-manager` bila github tetap diblokir?
-- WiFi attach menunggu modem, atau ada jalur HIF mandiri?
+- Qualcomm downstream `wlan.ko` (`qcacld-3.0`) + `icnss2` pada SM6375 membutuhkan userspace daemon Android (`cnss-daemon`) untuk menyelesaikan handshake QMI sebelum WLAN firmware menerbitkan event `FW_READY`.
+- Partisi stock vendor dan stock system di-mount secara read-only dari partisi `super` (`/dev/sde25`).
+- Android runtime APEX diekstrak untuk menyediakan Bionic libc dan dynamic linker 64-bit (`linker64`).
+- Android `binderfs` dimount di `/dev/binderfs` dengan node `/dev/binder` dan `/dev/vndbinder`.
+- Bionic WaitForProperty and SELinux checks pada daemon vendor di-bypass secara dinamis via binary patch minimal (4 byte di `libbinder.so` dan 8 byte di `vndservicemanager`).
+- Stack daemon vendor (`vndservicemanager`, `pm-service`, `pm-proxy`, `cnss-daemon`) dikelola secara native via OpenRC service `/etc/init.d/fogos-wifi`.
+- `wlan0` terdaftar secara native di kernel dan NetworkManager, mendukung pemindaian dual-band 2.4GHz dan 5GHz (1170 Mbit/s, 802.11ac).
+

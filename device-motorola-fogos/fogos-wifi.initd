@@ -1,0 +1,52 @@
+#!/sbin/openrc-run
+description="Motorola Moto G34 5G Wi-Fi Daemon Stack"
+
+depend() {
+    need pd-mapper tqftpserv
+    before networkmanager
+}
+
+start_pre() {
+    /usr/share/fogos/wifi-prepare.sh
+}
+
+start() {
+    ebegin "Starting fogos Wi-Fi daemons"
+    
+    if ! pgrep -f android-log-catcher >/dev/null; then
+        /usr/bin/android-log-catcher >/dev/null 2>&1 &
+    fi
+
+    if ! pgrep -f "vndservicemanager /dev/vndbinder" >/dev/null; then
+        /vendor/bin/vndservicemanager /dev/vndbinder >/dev/null 2>&1 &
+        sleep 0.5
+    fi
+
+    if ! pgrep -x pm-service >/dev/null; then
+        /vendor/bin/pm-service >/dev/null 2>&1 &
+        sleep 0.5
+    fi
+
+    if ! pgrep -x pm-proxy >/dev/null; then
+        /vendor/bin/pm-proxy >/dev/null 2>&1 &
+        sleep 0.5
+    fi
+
+    if ! pgrep -x cnss-daemon >/dev/null; then
+        /vendor/bin/cnss-daemon -l >/dev/null 2>&1 &
+        sleep 1
+    fi
+
+    if [ ! -d /sys/class/net/wlan0 ]; then
+        modprobe wlan 2>/dev/null || true
+        echo ON > /dev/wlan 2>/dev/null || true
+    fi
+
+    eend 0
+}
+
+stop() {
+    ebegin "Stopping fogos Wi-Fi daemons"
+    killall -9 cnss-daemon pm-proxy pm-service vndservicemanager android-log-catcher 2>/dev/null || true
+    eend 0
+}

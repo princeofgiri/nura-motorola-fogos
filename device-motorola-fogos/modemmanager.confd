@@ -1,2 +1,2 @@
 export LD_PRELOAD="/usr/lib/libmm-slot-fix.so"
-modemmanager_opts="--test-quick-suspend-resume"
+modemmanager_opts=""

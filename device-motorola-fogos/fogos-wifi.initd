@@ -2,7 +2,7 @@
 description="Motorola Moto G34 5G Wi-Fi Daemon Stack"
 
 depend() {
-    need pd-mapper tqftpserv
+    need pd-mapper tqftpserv rmtfs
     before networkmanager
 }
 

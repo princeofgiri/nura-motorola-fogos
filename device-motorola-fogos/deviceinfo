@@ -17,7 +17,7 @@ deviceinfo_codename="motorola-fogos"
 deviceinfo_year="2023"
 deviceinfo_dtb="vendor/qcom/blair-moto-fogos-pmos"
 deviceinfo_append_dtb="true"
-deviceinfo_flash_kernel_on_update="true"
+deviceinfo_flash_kernel_on_update="false"
 deviceinfo_arch="aarch64"
 
 # Device related

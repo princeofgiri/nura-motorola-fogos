@@ -1,0 +1,5 @@
+#!/bin/sh
+# Set all Qualcomm subsystem restart levels to RELATED so a modem or DSP crash restarts cleanly without panicking the kernel
+for s in /sys/bus/msm_subsys/devices/subsys*; do
+    [ -e "$s/restart_level" ] && echo RELATED > "$s/restart_level" 2>/dev/null || true
+done

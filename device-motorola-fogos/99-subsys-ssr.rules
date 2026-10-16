@@ -1,0 +1,2 @@
+# Automatically set all Qualcomm MSM subsystem restart levels to RELATED
+ACTION=="add", SUBSYSTEM=="msm_subsys", ATTR{restart_level}="RELATED"

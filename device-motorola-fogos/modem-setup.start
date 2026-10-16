@@ -41,8 +41,8 @@ MMEOF
     chmod +x /usr/sbin/ModemManager
 fi
 
-# Boot ADSP and Modem
-echo 1 > /sys/kernel/boot_adsp/boot 2>/dev/null || true
+# Boot ADSP and Modem (commented out until modem userspace is fully configured to prevent DOG watchdog crash)
+# echo 1 > /sys/kernel/boot_adsp/boot 2>/dev/null || true
 
 # Pre-load WLAN kernel module
-modprobe wlan 2>/dev/null || true
+# modprobe wlan 2>/dev/null || true

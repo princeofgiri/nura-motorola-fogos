@@ -302,6 +302,27 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
   - Daemon `seatd` diaktifkan di default runlevel OpenRC.
   - Sudo passwordless dikonfigurasi untuk user `symbiot`.
 
+### 16 Okt 2026: Wi-Fi, SSR Stability, and Audio Bring-up
+
+- **Wi-Fi & Internet Routing**:
+  - Wi-Fi aktif dan terhubung via `wlan0` (IP 192.168.0.191).
+  - SSH direct via Wi-Fi (`symbiot@192.168.0.191`) diverifikasi tanpa kabel USB.
+  - Perbaikan metrik rute di `/etc/local.d/net-route.start` (`default via 172.16.42.2 dev usb0 metric 1000`) sehingga default gateway utama otomatis melalui `wlan0` (metric 600). Ping `google.com` via Wi-Fi sukses (0% packet loss, avg 19-21ms).
+- **Subsystem Restart (SSR) & Bootloop Fix**:
+  - Root cause reboot saat Wi-Fi tap / modem crash: Hexagon modem mengalami stalled watchdog `DOG detects stalled initialization` karena `rmtfs` belum siap saat `cnss-daemon` mengakses modem. Nilai default `restart_level` adalah `SYSTEM` sehingga memicu kernel panic / SoC reset.
+  - Solusi: Menyetel `restart_level` ke `RELATED` untuk semua subsistem via `/etc/local.d/00-subsys-ssr.start` dan `/etc/udev/rules.d/99-subsys-ssr.rules`.
+  - Service `rmtfs` dikonfigurasi dengan flag `-r -P` dan dijadikan dependency `need` di `/etc/init.d/fogos-wifi`.
+  - Memulihkan kernel binary valid di `/boot/vmlinuz-5.4.302-moto` dan `/boot/vmlinuz` serta menonaktifkan auto-flash `boot-deploy` (`deviceinfo_flash_kernel_on_update="false"`).
+- **Audio Bring-Up (ALSA & PulseAudio)**:
+  - Hexagon ADSP di-boot via `/sys/kernel/boot_adsp/boot` (`apr_adsp_up: Q6 is Up`).
+  - Techpack audio kernel modules dimuat (`pinctrl_lpi_dlkm`, `swr_ctrl_dlkm`, `tx_macro_dlkm`, `rx_macro_dlkm`, `va_macro_dlkm`, `wcd937x_slave_dlkm`, `stub_dlkm`, `native_dlkm`, `fs1815_dlkm`, `machine_dlkm`).
+  - Sound card terdaftar di ALSA: `card 0: holi9370fs1815s [holi-9370_fs1815-snd-card]` dengan 41 PCM devices.
+  - Firmware Smart PA `/lib/firmware/fs1815.fsm` (1052 bytes) berhasil dimuat oleh `fs1815_dlkm`; kedua instance PA (0x35 Speaker dan 0x34 Receiver/Handset) terinisialisasi (`dev initilized`, `preset ver:A5E0`).
+  - Routing MultiMedia1 -> `RX_CDC_DMA_RX_0` dan switch amplifier (`FSM_Amp_Switch=1`, `FSM_Scene=0`) disetel sesuai `mixer_paths.xml`.
+  - PulseAudio 17.0 otomatis mendeteksi sink stereo fallback sebagai default sink.
+  - Dibuat `/etc/local.d/audio.start` dan dimasukkan ke paket `device-motorola-fogos` (pkgrel 7).
+  - Playback tes nada chime terverifikasi via `paplay` dan `aplay`.
+
 ## Perintah penting
 
 ```bash

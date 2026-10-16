@@ -1,0 +1,2 @@
+# Automatically enable Fast Charging (2.5A) when USB charger is plugged in
+SUBSYSTEM=="power_supply", ATTR{online}=="1", RUN+="/bin/sh -c 'echo 2500000 > /sys/bus/iio/devices/iio:device5/in_current_main_constant_charge_current_max_input 2>/dev/null || true'"

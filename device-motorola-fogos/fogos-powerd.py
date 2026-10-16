@@ -24,6 +24,13 @@ EVENT_SIZE = 24
 EVENT_FORMAT = "qqHHi"
 EVIOCGRAB = 0x40044590
 
+FCC_FILE = "/sys/bus/iio/devices/iio:device5/in_current_main_constant_charge_current_max_input"
+USB_ONLINE = "/sys/class/power_supply/usb/online"
+BATT_CAPACITY = "/sys/class/power_supply/qcom_battery/capacity"
+BATT_CURRENT = "/sys/class/power_supply/qcom_battery/current_now"
+BATT_VOLTAGE = "/sys/class/power_supply/qcom_battery/voltage_now"
+TOTAL_CAP_UAH = 5105000
+
 EV_SYN = 0
 EV_KEY = 1
 EV_ABS = 3
@@ -31,6 +38,26 @@ EV_ABS = 3
 KEY_POWER = 116
 KEY_WAKEUP = 143
 BTN_TOUCH = 330
+
+def get_voltage_soc(v_uv, current_ua):
+    ocv_mv = (v_uv / 1000.0) - ((current_ua / 1000000.0) * 60.0)
+    if ocv_mv >= 4350:
+        return 100
+    elif ocv_mv >= 4200:
+        return int(85 + (ocv_mv - 4200) / 150.0 * 15)
+    elif ocv_mv >= 4000:
+        return int(60 + (ocv_mv - 4000) / 200.0 * 25)
+    elif ocv_mv >= 3850:
+        return int(40 + (ocv_mv - 3850) / 150.0 * 20)
+    elif ocv_mv >= 3750:
+        return int(20 + (ocv_mv - 3750) / 100.0 * 20)
+    elif ocv_mv >= 3650:
+        return int(10 + (ocv_mv - 3650) / 100.0 * 10)
+    elif ocv_mv >= 3500:
+        return int(3 + (ocv_mv - 3500) / 150.0 * 7)
+    else:
+        return 1
+
 
 def find_input_device(name_substring):
     try:
@@ -109,6 +136,61 @@ def main():
     saved_brightness = max(100, get_brightness())
     last_user_activity = time.time()
     last_tap_time = 0
+    last_chg_check = 0
+    last_batt_time = time.time()
+    estimated_soc = None
+
+    def manage_battery(current_time):
+        nonlocal last_chg_check, last_batt_time, estimated_soc
+        if current_time - last_chg_check < 3.0:
+            return
+        dt = current_time - last_batt_time
+        last_batt_time = current_time
+        last_chg_check = current_time
+
+        # 1. Maintain Fast Charge Current (2.5A) when charger is plugged in
+        try:
+            if os.path.exists(USB_ONLINE) and os.path.exists(FCC_FILE):
+                with open(USB_ONLINE, "r") as f:
+                    online = f.read().strip()
+                if online == "1":
+                    with open(FCC_FILE, "r") as f:
+                        cur_fcc = int(f.read().strip())
+                    if cur_fcc < 2000000:
+                        with open(FCC_FILE, "w") as f:
+                            f.write("2500000\n")
+        except Exception:
+            pass
+
+        # 2. Track & update battery capacity
+        try:
+            if os.path.exists(BATT_VOLTAGE) and os.path.exists(BATT_CURRENT) and os.path.exists(BATT_CAPACITY):
+                with open(BATT_VOLTAGE, "r") as f:
+                    v_uv = int(f.read().strip())
+                with open(BATT_CURRENT, "r") as f:
+                    i_ua = int(f.read().strip())
+
+                v_soc = get_voltage_soc(v_uv, i_ua)
+
+                if estimated_soc is None:
+                    estimated_soc = float(v_soc)
+                else:
+                    # In qcom_battery, positive current = charging, negative = discharging
+                    delta_uah = i_ua * (dt / 3600.0)
+                    delta_soc = (delta_uah / TOTAL_CAP_UAH) * 100.0
+                    estimated_soc += delta_soc
+                    # Smooth blend with voltage OCV curve to prevent drift
+                    estimated_soc = estimated_soc * 0.98 + v_soc * 0.02
+                    estimated_soc = max(1.0, min(100.0, estimated_soc))
+
+                new_soc = int(round(estimated_soc))
+                with open(BATT_CAPACITY, "r") as f:
+                    cur_soc = int(f.read().strip())
+                if new_soc != cur_soc:
+                    with open(BATT_CAPACITY, "w") as f:
+                        f.write(f"{new_soc}\n")
+        except Exception:
+            pass
 
     fds = [fd_pwr]
     if fd_touch is not None:
@@ -116,6 +198,7 @@ def main():
 
     while running:
         now = time.time()
+        manage_battery(now)
         cur_bl = get_brightness()
 
         # Check idle timeout (only when screen is ON)

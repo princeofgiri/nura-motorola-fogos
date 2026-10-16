@@ -6,3 +6,10 @@ if [ -f /sys/class/power_supply/qcom_battery/type ]; then
     mount --bind /run/fogos/battery_type /sys/class/power_supply/qcom_battery/type
     killall upowerd 2>/dev/null || true
 fi
+
+# Set Fast Charging Current (FCC) to 2.5A
+FCC="/sys/bus/iio/devices/iio:device5/in_current_main_constant_charge_current_max_input"
+if [ -f "$FCC" ]; then
+    echo 2500000 > "$FCC" 2>/dev/null || true
+fi
+

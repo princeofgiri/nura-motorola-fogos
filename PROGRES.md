@@ -276,6 +276,24 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
   penuh (`Dummy check incorrect`, SPI tak jawab) — selidiki power/pinctrl/sequencing
   (`fogos-touchscreen.dtsi`, LDO L9A) sebelum uji sentuh fisik.
 
+### 16 Okt 2026: Direct Flashing, Atomic KMS Fix, Touchscreen & 60Hz Display OK
+
+- **Direct Rootfs & Boot Flashing**:
+  - Dibuat `tools/flash_rootfs.py` untuk streaming rootfs mentah langsung ke `/dev/sde26` (`userdata`, ext4 241 GiB) dan `boot.img` ke `/dev/sdf18` (`boot_b`) dari shell Linux / recovery.
+  - Slot `_b` ditandai boot sukses permanen menggunakan `qbootctl -m`.
+- **KWin Display Fix (Atomic KMS)**:
+  - Root cause layar hitam / dmesg tty0: `KWIN_DRM_NO_AMS=1` memaksa KWin menggunakan legacy path (`drmModeSetCrtc`), yang gagal di driver downstream MSM DRM (`Applying output configuration failed: No such device or address` / ENXIO) saat mencoba sharing frame antara `renderD128` dan `card0`.
+  - Solusi: Menghapus `KWIN_DRM_NO_AMS=1` dan menyetel `KWIN_DRM_DEVICES=/dev/dri/card0`. KWin berjalan mulus dengan Atomic KMS di `/dev/dri/card0` tanpa error.
+- **Refresh Rate 60Hz**:
+  - Mengubah mode aktif display ke 60Hz (`720x1600@60Hz`, scale 2.0) via `kscreen-doctor output.1.mode.3`. Driver MSM DSI sukses menyetel `fps=60`. Konfigurasi tersimpan permanen di `~/.config/kwinoutputconfig.json`.
+- **Touchscreen Firmware & Multitouch**:
+  - Firmware `ILITEK_FW` (507 KB) disalin ke `/lib/firmware/ILITEK_FW`.
+  - Driver `ILITEK_TDDI` sukses memuat firmware dan mendaftarkan perangkat input di `/dev/input/event2`.
+  - Quirk `local-overrides.quirks` menonaktifkan `BTN_TOOL_FINGER` sehingga libinput mengenali sebagai touch device. Multitouch 10-point terverifikasi responsif secara fisik di lockscreen dan setup wizard.
+- **System**:
+  - Daemon `seatd` diaktifkan di default runlevel OpenRC.
+  - Sudo passwordless dikonfigurasi untuk user `symbiot`.
+
 ## Perintah penting
 
 ```bash

@@ -6,12 +6,12 @@ Ditulis 15 Okt 2026. Detail harian ada di `PROGRES.md` (bagian Indonesia).
 ## 1. TL;DR
 
 - Target: Nura OS (= postmarketOS, tooling identik `pmbootstrap` + `pmaports`) di **Moto G34 5G (fogos, XT2363-9, SM6375 Snapdragon 695)**, kernel downstream 5.4 LineageOS.
-- Status: **boot permanen + display + Plasma Mobile GUI + touch 10-point multitouch + Modem ONLINE ✔** (terverifikasi di HP).
-- Kernel aktif: **5.4.302-r10 (`#11-postmarketOS`)** terpasang dan boot sempurna. Patch 0002 CFI panic fix aktif.
-- Modem Qualcomm Hexagon (MSS) ONLINE via QRTR Node 0, `rmnet_ipa0` up, `pd-mapper` running.
-- GUI Plasma Mobile 6.7.5 berjalan di KWin Wayland menggunakan mode Legacy KMS (`KWIN_DRM_NO_AMS=1`).
-- Touchscreen ILITEK_TDDI aktif via eudev-libs + udev 0666 + libinput quirk. Mode tablet aktif di kwinrc.
-- Optimasi performa: Display 60Hz (`720x1600@60Hz`), multi-threaded LLVMpipe (`LP_NUM_THREADS=8`), shader berat dimatikan.
+- Status: **boot permanen + display + Plasma Mobile GUI + touch 10-point multitouch OK ✔** (terverifikasi di HP).
+- Kernel aktif: **5.4.302-r10 (`#11-postmarketOS`)** terpasang dan boot sempurna di slot `_b` (`qbootctl -m` aktif).
+- GUI Plasma Mobile 6.7.5 berjalan di KWin Wayland menggunakan mode **Atomic KMS** (KWIN_DRM_DEVICES=/dev/dri/card0, tanpa KWIN_DRM_NO_AMS).
+- Touchscreen ILITEK_TDDI aktif via `/lib/firmware/ILITEK_FW` + eudev-libs + udev 0666 + libinput quirk. Lockscreen & wizard teruji responsif.
+- Display disetel ke 60Hz (`720x1600@60Hz`, scale 2.0) di `kwinoutputconfig.json`.
+- Flashing rootfs via `tools/flash_rootfs.py` langsung ke block device `/dev/sde26` (userdata) dan `/dev/sdf18` (boot_b).
 
 ## 2. Perangkat, mesin, akses
 

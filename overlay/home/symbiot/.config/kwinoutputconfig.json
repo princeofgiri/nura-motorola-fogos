@@ -6,17 +6,10 @@
                 "allowDdcCi": true,
                 "allowSdrSoftwareBrightness": true,
                 "autoBrightnessCurve": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
+                    [
+                        0,
+                        1
+                    ]
                 ],
                 "autoRotation": "InTabletMode",
                 "automaticBrightness": false,
@@ -24,8 +17,6 @@
                 "colorPowerTradeoff": "PreferEfficiency",
                 "colorProfileSource": "sRGB",
                 "connectorName": "DSI-1",
-                "customModes": [
-                ],
                 "detectedDdcCi": false,
                 "edidHash": "948862607bcd8a5ecc5cee8a023c7048",
                 "edidIdentifier": "QCM 1 1 27 2006 0",
@@ -36,14 +27,25 @@
                 "iccProfilePath": "",
                 "maxBitsPerColor": 0,
                 "mode": {
-                    "flags": 0,
-                    "height": 1600,
-                    "refreshRate": 60000,
-                    "width": 720
+                    "cvt": {
+                        "clock": 199506,
+                        "flags": 536870912,
+                        "hdisplay": 720,
+                        "hskew": 0,
+                        "hsyncEnd": 754,
+                        "hsyncStart": 746,
+                        "htotal": 774,
+                        "vdisplay": 1600,
+                        "vscan": 0,
+                        "vsyncEnd": 4266,
+                        "vsyncStart": 4264,
+                        "vtotal": 4296
+                    },
+                    "flags": 0
                 },
                 "overscan": 0,
                 "rgbRange": "Automatic",
-                "scale": 2.0,
+                "scale": 2,
                 "sdrBrightness": 200,
                 "sdrGamutWideness": 0,
                 "sharpness": 0,

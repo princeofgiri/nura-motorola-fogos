@@ -64,6 +64,8 @@ source="
 	wifi-prepare.sh
 	fogos-wifi.initd
 	50-fogos.pa
+	01-battery.start
+	powerdevilrc
 "
 
 build() {
@@ -107,6 +109,7 @@ package() {
 	install -Dm755 "$srcdir/touchscreen.start" "$pkgdir/etc/local.d/touchscreen.start"
 	install -Dm755 "$srcdir/rmtfs.start" "$pkgdir/etc/local.d/rmtfs.start"
 	install -Dm755 "$srcdir/modem-setup.start" "$pkgdir/etc/local.d/modem-setup.start"
+	install -Dm755 "$srcdir/01-battery.start" "$pkgdir/etc/local.d/01-battery.start"
 	install -Dm755 "$srcdir/net-route.start" "$pkgdir/etc/local.d/net-route.start"
 
 	# Udev rules and libinput quirks
@@ -119,8 +122,9 @@ package() {
 	install -Dm755 "$srcdir/00-kwin.sh" "$pkgdir/etc/tinydm.d/env-wayland.d/00-kwin.sh"
 	install -Dm755 "$srcdir/00-kwin.sh" "$pkgdir/etc/profile.d/kwin-drm.sh"
 
-	# Elogind power configuration (prevent screen sleep crash)
+	# Elogind and KDE power configuration (prevent screen sleep crash)
 	install -Dm644 "$srcdir/99-fogos-power.conf" "$pkgdir/etc/elogind/logind.conf.d/99-fogos-power.conf"
+	install -Dm644 "$srcdir/powerdevilrc" "$pkgdir/etc/xdg/powerdevilrc"
 
 	# Wi-Fi daemons, shims, and service
 	install -Dm755 "$srcdir/android-log-catcher" "$pkgdir/usr/bin/android-log-catcher"

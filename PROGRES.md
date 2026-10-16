@@ -323,6 +323,17 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
   - Dibuat `/etc/local.d/audio.start` dan dimasukkan ke paket `device-motorola-fogos` (pkgrel 7).
   - Playback tes nada chime terverifikasi via `paplay` dan `aplay`.
 
+- **Battery Detection & Icon (Plasma Mobile)**:
+  - Downstream Qualcomm kernel secara default melaporkan `/sys/class/power_supply/qcom_battery/type` sebagai `Mains`, sehingga UPower mengklasifikasikan baterai sebagai charger dinding (`line_power_qcom_battery`) dan menampilkan status 0% / `battery-missing-symbolic`.
+  - Dibuat `/etc/local.d/01-battery.start` yang melakukan bind mount teks `Battery` ke `/sys/class/power_supply/qcom_battery/type` dan me-restart `upowerd`.
+  - UPower dan Plasma Mobile kini mengenali `battery_qcom_battery` dengan akurat (kapasitas persentase, voltase, waktu pengosongan, dan status discharging) dan menampilkan ikon baterai + persentase di status bar.
+
+- **Pencegahan Crash Layar Blank / DPMS Sleep (Kernel Panic SDE)**:
+  - Saat UPower beralih ke mode baterai (`On Battery`), KDE PowerDevil secara default mengaktifkan timeout layar 30 detik (`TurnOffDisplayIdleTimeoutSec=30`).
+  - Pada kernel downstream MSM DRM Qualcomm 5.4 (Snapdragon 695), mematikan tampilan atau meredupkan via DPMS memutus clock subsistem display (SDE). Saat commit grafis atau pembersihan dim layer berjalan (`_sde_crtc_blend_setup` -> `sde_hw_lm_clear_dim_layer` -> `sde_reg_read`), pembacaan register tanpa clock memicu `synchronous external abort: 96000010` (kernel panic seketika).
+  - Solusi: Dibuat template konfigurasi KDE PowerDevil `/etc/xdg/powerdevilrc` (dan `~/.config/powerdevilrc`) yang menonaktifkan pemadaman display idle dan auto-suspend (`TurnOffDisplayWhenIdle=false`, `DimDisplayWhenIdle=false`, `TurnOffDisplayIdleTimeoutSec=-1`) pada seluruh profil (`[AC]`, `[Battery]`, `[LowBattery]`).
+  - Layar kini tetap menyala stabil dan responsif tanpa resiko hang/reboot saat ditinggal idle.
+
 ## Perintah penting
 
 ```bash

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Fix battery detection in postmarketOS / UPower
+mkdir -p /run/fogos
+echo "Battery" > /run/fogos/battery_type
+if [ -f /sys/class/power_supply/qcom_battery/type ]; then
+    mount --bind /run/fogos/battery_type /sys/class/power_supply/qcom_battery/type
+    killall upowerd 2>/dev/null || true
+fi

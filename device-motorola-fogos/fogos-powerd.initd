@@ -1,0 +1,11 @@
+#!/sbin/openrc-run
+description="Motorola Moto G34 5G Power & Wakeup Daemon"
+
+command="/usr/bin/fogos-powerd.py"
+command_background="yes"
+pidfile="/run/fogos-powerd.pid"
+
+depend() {
+    need localmount
+    after udev elogind
+}

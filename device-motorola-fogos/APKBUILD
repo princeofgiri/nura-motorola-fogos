@@ -66,6 +66,8 @@ source="
 	50-fogos.pa
 	01-battery.start
 	powerdevilrc
+	fogos-powerd.py
+	fogos-powerd.initd
 "
 
 build() {
@@ -131,6 +133,10 @@ package() {
 	install -Dm755 "$srcdir/fogos-patch.py" "$pkgdir/usr/lib/fogos-patch.py"
 	install -Dm755 "$srcdir/wifi-prepare.sh" "$pkgdir/usr/share/fogos/wifi-prepare.sh"
 	install -Dm755 "$srcdir/fogos-wifi.initd" "$pkgdir/etc/init.d/fogos-wifi"
+
+	# Power and display wake daemon (power button & double tap to wake)
+	install -Dm755 "$srcdir/fogos-powerd.py" "$pkgdir/usr/bin/fogos-powerd.py"
+	install -Dm755 "$srcdir/fogos-powerd.initd" "$pkgdir/etc/init.d/fogos-powerd"
 
 	# PulseAudio audio configuration
 	install -Dm644 "$srcdir/50-fogos.pa" "$pkgdir/etc/pulse/default.pa.d/50-fogos.pa"

@@ -334,6 +334,14 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
   - Solusi: Dibuat template konfigurasi KDE PowerDevil `/etc/xdg/powerdevilrc` (dan `~/.config/powerdevilrc`) yang menonaktifkan pemadaman display idle dan auto-suspend (`TurnOffDisplayWhenIdle=false`, `DimDisplayWhenIdle=false`, `TurnOffDisplayIdleTimeoutSec=-1`) pada seluruh profil (`[AC]`, `[Battery]`, `[LowBattery]`).
   - Layar kini tetap menyala stabil dan responsif tanpa resiko hang/reboot saat ditinggal idle.
 
+- **Power Button Sleep/Wake & Double Tap to Wake (DT2W)**:
+  - Dibuat daemon `fogos-powerd` (`/usr/bin/fogos-powerd.py` dan OpenRC service `/etc/init.d/fogos-powerd`).
+  - Mengambil akses eksklusif (`EVIOCGRAB`) terhadap tombol power fisik (`/dev/input/event0`, `qpnp_pon`) sehingga KWin tidak memicu DPMS off.
+  - Saat tombol power ditekan (layar ON): Backlight dimatikan (`brightness=0`) dan sesi dikunci (`loginctl lock-session`).
+  - Saat tombol power ditekan (layar OFF): Backlight dipulihkan seketika ke nilai semula (50%), menampilkan lockscreen PIN/jam/baterai.
+  - Fitur **Double Tap to Wake (DT2W)** diaktifkan pada IC Ilitek (`echo 1 > /sys/devices/virtual/touchscreen/primary/gesture`). Ketukan 2x pada layar saat kondisi padam langsung membangunkan layar tanpa perlu menyentuh tombol power fisik.
+  - Auto-sleep timer 120 detik: Jika ponsel tidak disentuh selama 2 menit, layar otomatis padam dan terkunci secara aman tanpa crash.
+
 ## Perintah penting
 
 ```bash

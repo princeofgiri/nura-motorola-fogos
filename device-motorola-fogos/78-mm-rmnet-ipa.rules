@@ -1,1 +1,4 @@
-ACTION=="add|change", SUBSYSTEM=="net", KERNEL=="rmnet_ipa*", ENV{ID_MM_QCOM_SOC}="1", ENV{ID_MM_PHYSDEV_UID}="qcom-soc", ENV{ID_MM_CANDIDATE}="1"
+ACTION=="add|change", SUBSYSTEM=="net", KERNEL=="rmnet_ipa*", ENV{ID_MM_QCOM_SOC}="1", ENV{ID_MM_PHYSDEV_UID}="qcom-soc", ENV{ID_MM_CANDIDATE}="1", ENV{ID_MM_DEVICE_PROCESS}="1"
+ACTION=="add|change", SUBSYSTEM=="net", KERNEL=="qmapmux*", ENV{ID_MM_QCOM_SOC}="1", ENV{ID_MM_PHYSDEV_UID}="qcom-soc", ENV{ID_MM_CANDIDATE}="1", ENV{ID_MM_DEVICE_PROCESS}="1"
+ACTION=="add|change", SUBSYSTEM=="net", KERNEL=="rmnet_data*", ENV{ID_MM_PORT_IGNORE}="1"
+ACTION=="add|change", SUBSYSTEM=="net", KERNEL=="r_rmnet_data*", ENV{ID_MM_PORT_IGNORE}="1"

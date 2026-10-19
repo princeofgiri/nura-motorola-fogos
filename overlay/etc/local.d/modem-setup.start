@@ -1,30 +1,81 @@
 #!/bin/sh
-# Setup FSG and carrier MBN symlinks
-mkdir -p /mnt/fsg /vendor/fsg /readonly/vendor/fsg /lib/firmware/fsg
-mount -t ext4 -o ro /dev/sdd13 /mnt/fsg 2>/dev/null || true
-mount --bind /mnt/fsg /vendor/fsg 2>/dev/null || true
-mount --bind /mnt/fsg /readonly/vendor/fsg 2>/dev/null || true
-mount --bind /mnt/fsg /lib/firmware/fsg 2>/dev/null || true
+# Get current slot
+SLOT=$(cat /proc/cmdline | grep -o 'androidboot.slot_suffix=_[ab]' | cut -d= -f2)
+[ -z "$SLOT" ] && SLOT="_b"
 
-# Setup disk partlabel symlinks for rmtfs
-ln -sf /dev/disk/by-partlabel/fsg_a /dev/disk/by-partlabel/modem_fsg 2>/dev/null || true
+# Setup FSG and carrier MBN symlinks
+FSG_DEV="/dev/disk/by-partlabel/fsg${SLOT}"
+[ -e "$FSG_DEV" ] || FSG_DEV="/dev/disk/by-partlabel/fsg_a"
+ln -sf "$FSG_DEV" /dev/disk/by-partlabel/modem_fsg 2>/dev/null || true
 ln -sf /dev/disk/by-partlabel/fsc /dev/disk/by-partlabel/modem_fsc 2>/dev/null || true
 ln -sf /dev/disk/by-partlabel/modemst1 /dev/disk/by-partlabel/modem_fs1 2>/dev/null || true
 ln -sf /dev/disk/by-partlabel/modemst2 /dev/disk/by-partlabel/modem_fs2 2>/dev/null || true
 
+mkdir -p /mnt/fsg /vendor/fsg /readonly/vendor/fsg /lib/firmware/fsg
+mount -t ext4 -o ro "$FSG_DEV" /mnt/fsg 2>/dev/null || true
+mount --bind /mnt/fsg /vendor/fsg 2>/dev/null || true
+mount --bind /mnt/fsg /readonly/vendor/fsg 2>/dev/null || true
+mount --bind /mnt/fsg /lib/firmware/fsg 2>/dev/null || true
+
 # Setup tqftpserv firmware links
-mkdir -p /firmware /readonly/firmware /readonly/vendor/firmware_mnt
-ln -sf /run/msm-firmware-loader/mnt/modem_a/image /firmware/image 2>/dev/null || true
-ln -sf /run/msm-firmware-loader/mnt/modem_a/image /readonly/firmware/image 2>/dev/null || true
-ln -sf /run/msm-firmware-loader/mnt/modem_a/image /readonly/vendor/firmware_mnt/image 2>/dev/null || true
+MODEM_DIR="/run/msm-firmware-loader/mnt/modem${SLOT}"
+[ -d "$MODEM_DIR/image" ] || MODEM_DIR=$(ls -d /run/msm-firmware-loader/mnt/modem_* 2>/dev/null | head -n1)
+
+if [ -n "$MODEM_DIR" ] && [ -d "$MODEM_DIR/image" ]; then
+    mkdir -p /firmware /readonly/firmware /readonly/vendor/firmware_mnt /var/lib/tqftpserv
+    ln -sfn "$MODEM_DIR/image" /firmware/image
+    ln -sfn "$MODEM_DIR/image" /readonly/firmware/image
+    ln -sfn "$MODEM_DIR/image" /readonly/vendor/firmware_mnt/image
+    ln -sfn "$MODEM_DIR/image" /lib/firmware/image
+    ln -sfn "$MODEM_DIR/image/modem_pr" /lib/firmware/modem_pr
+    ln -sfn "$MODEM_DIR/image" /var/lib/tqftpserv/image
+    ln -sfn "$MODEM_DIR/image/modem_pr" /var/lib/tqftpserv/modem_pr
+    cp -n "$MODEM_DIR/image"/*.jsn /lib/firmware/ 2>/dev/null || true
+    ln -sf /lib/firmware/wlanmdsp.mbn /var/lib/tqftpserv/ 2>/dev/null || true
+
+    mkdir -p /sys/class/remoteproc/remoteproc0 /sys/class/remoteproc/remoteproc1
+    echo wlanmdsp.mbn > /sys/class/remoteproc/remoteproc0/firmware 2>/dev/null || true
+    echo modem.mbn > /sys/class/remoteproc/remoteproc1/firmware 2>/dev/null || true
+fi
 
 # Setup ModemManager wrapper diversion if needed
 if [ -f /usr/sbin/ModemManager ] && [ ! -L /usr/sbin/ModemManager ] && ! grep -q "LD_PRELOAD" /usr/sbin/ModemManager 2>/dev/null; then
     mv /usr/sbin/ModemManager /usr/sbin/ModemManager.real
-    cat << 'EOF' > /usr/sbin/ModemManager
-#!/bin/sh
-export LD_PRELOAD=/usr/lib/libmm-slot-fix.so
-exec /usr/sbin/ModemManager.real "$@"
-EOF
-    chmod +x /usr/sbin/ModemManager
 fi
+
+cat << 'MMEOF' > /usr/sbin/ModemManager
+#!/bin/sh
+rm -f /tmp/mm_qmapmux_sysfs/lower_rmnet_ipa0
+mkdir -p /tmp/mm_qmapmux_sysfs
+ln -s /sys/devices/virtual/net/rmnet_ipa0 /tmp/mm_qmapmux_sysfs/lower_rmnet_ipa0
+
+# Wait for modem SIM to be detected and provision it
+for i in $(seq 1 45); do
+    status=$(qmicli -d qrtr://0 --uim-get-card-status 2>/dev/null)
+    if echo "$status" | grep -q "Application state: 'detected'"; then
+        qmicli -d qrtr://0 --uim-change-provisioning-session="session-type=primary-gw-provisioning,activate=yes,slot=1,aid=A0000000871002FF62F00189000001FF" >/dev/null 2>&1
+        qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1
+        break
+    elif echo "$status" | grep -q "Application state: 'ready'"; then
+        qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1
+        break
+    fi
+    sleep 1
+done
+
+exec env LD_PRELOAD=/usr/lib/libmm-slot-fix.so /usr/sbin/ModemManager.real --debug "$@" >> /var/log/modemmanager.log 2>&1
+MMEOF
+chmod +x /usr/sbin/ModemManager
+
+
+# Activate SIM provisioning and bring baseband online
+for i in $(seq 1 15); do
+    if qmicli -d qrtr://0 --dms-get-operating-mode >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+
+qmicli -d qrtr://0 --uim-change-provisioning-session="session-type=primary-gw-provisioning,activate=yes,slot=1,aid=A0000000871002FF62F00189000001FF" >/dev/null 2>&1 || true
+qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1 || true
+

@@ -25,11 +25,24 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
       Optimasi UI: panel diturunkan ke 60Hz (`720x1600@60Hz`), multi-threaded LLVMpipe
       `LP_NUM_THREADS=8` + `QSG_RENDER_LOOP=threaded`, efek berat (blur, contrast, translucency)
       dimatikan untuk menjaga responsivitas CPU software rasterizer.
-- [x] **M5 — Modem & SIM Card Terdeteksi (15 Okt)**:
-      - ModemManager mendeteksi perangkat Qualcomm SoC (`/org/freedesktop/ModemManager1/Modem/0`), terikat ke `qrtr0` (qmi) dan `rmnet_ipa0` (net).
-      - Bug DSDS ModemManager (slot 2 kosong menimpa slot 1 aktif) berhasil diatasi via shim library `libmm-slot-fix.so` (`LD_PRELOAD`).
-      - SIM fisik di Slot 1 terdeteksi sempurna: ICCID `8962100048909141989`, IMSI `510104890914198`, Operator ID `51010` (Telkomsel Indonesia).
-      - Modem bertransisi ke status `state: enabled`, `power state: on`, registration `idle`.
+- [x] **M5 — Modem Baseband Online & Registrasi Tower Telkomsel ✔ SEMPURNA (15-17 Okt)**:
+      - ModemManager mendeteksi perangkat Qualcomm SoC (`/org/freedesktop/ModemManager1/Modem/1`), terikat ke `qrtr0` (qmi) dan `rmnet_ipa0` (net).
+      - Bug DSDS ModemManager (slot 2 kosong menimpa slot 1 aktif) berhasil diatasi secara bersih via shim library `libmm-slot-fix.so` (`LD_PRELOAD`) yang secara dinamis menandai slot kosong sebagai `INACTIVE`, mem-bypass timeout 25 carrier config pada PDC `list_configs`, dan menangani quirk QMI DMS `Set Operating Mode` & NAS preference.
+      - SIM fisik By.U di Slot 1 terdeteksi 100% sempurna di userspace & baseband: ICCID `8962100048909141989`, IMSI `510104890914198`, Operator ID `51010` (Telkomsel), GID1/GID2 `02`, sesi provisioning aktif di slot 1, app 1.
+      - **Root Cause QMI Error 52 (DeviceNotReady / HOST_IMAGE_MISCONFIGURATION) Dipecahkan**:
+        - Saat boot, Hexagon modem MPSS meminta DSP shared object RF `/readonly/firmware/image/modem_pr/so/568_0_0.mbn` via TFTP.
+        - `tqftpserv` menolak permintaan tersebut karena symlink `/lib/firmware/modem_pr` belum ada dan mock remoteproc belum diinisialisasi sebelum daemon berjalan (`tqftpserv` berjalan di runlevel `boot`, sebelum `local.d`).
+        - Diperbaiki dengan memindahkan setup symlink (`image`, `modem_pr/so`, `remoteproc`) dan mount partisi FSG ke dalam `start_pre()` di `/etc/init.d/tqftpserv`.
+      - **Band Capabilities Penuh & Baseband Online**:
+        - `dms-get-capabilities` melaporkan `gsm, umts, lte, 5gnr`.
+        - `dms-get-band-capabilities` melaporkan seluruh band aktif: LTE B1, B2, B3, B5, B7, B8, B20, B26, B28, B32, B38, B40, B41, B42 serta NR5G N1, N3, N5, N7, N8, N20, N26, N28, N38, N40, N41, N77, N78.
+        - `dms-set-operating-mode=online` sukses tanpa error (`Mode: 'online'`, `HW restricted: 'no'`).
+      - **MBN Telkomsel Aktif & Registrasi Tower Sukses**:
+        - MBN Telkomsel (`20016B7FEE23ACA24DC4D7D145C9BF2C13E943C0`) diverifikasi sebagai active software config di PDC.
+        - Modem berhasil register ke tower seluler: `state: registered`, `registration: home`, `CS domain: attached`, `PS domain: attached`.
+        - Operator: `IND TELKOMSEL` (`51010` / `by.U`), Cell ID: `37838879`, TAC: `1152`.
+        - Sinyal: `99%` (LTE & 5G NR, RSRP -90 dBm, RSSI -57 dBm, SNR 6.6 dB).
+        - Audio ALSA stereo (`qcom_q6core-audio_sound`) dan Wi-Fi (`wlan0` 192.168.0.191) tetap utuh dan stabil.
 - [x] **M6 — Packaging & KWin Legacy KMS DRM Layer Fix (15 Okt)**:
       - Seluruh perbaikan live (`libqrtr-fix.so`, `libmm-slot-fix.so`, udev rules, local.d autostart, conf.d) dikemas resmi ke paket `device-motorola-fogos` (pkgver=3-r3).
       - Build APK sukses via `pmbootstrap build device-motorola-fogos --arch aarch64` (`device-motorola-fogos-3-r3.apk`).
@@ -45,7 +58,7 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
       - Stack daemon Android vendor (`vndservicemanager`, `pm-service`, `pm-proxy`, `cnss-daemon`) berhasil berjalan sepenuhnya secara native di postmarketOS.
       - `wlan0` terdaftar secara native di kernel dan NetworkManager, mendukung pemindaian dual-band 2.4GHz dan 5GHz (terdeteksi puluhan AP dengan sinyal penuh dan kecepatan hingga 1170 Mbit/s).
       - Seluruh stack dikemas ke dalam OpenRC service `fogos-wifi` di `device-motorola-fogos` (pkgver=3-r5).
-- [ ] Berikutnya: Network registration attach, mobile data rmnet_ipa0, audio internal.
+- [ ] Berikutnya: Packet data attach (EPS/PS attach), mobile data routing rmnet_ipa0, audio internal routing.
 
 ## File port (kanonis, di `~/nura-fogos/`)
 

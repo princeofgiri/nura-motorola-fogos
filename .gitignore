@@ -8,3 +8,19 @@ __pycache__/
 stock-backup/
 tmp/
 .cache/
+
+# Secrets & Credentials
+telebot
+
+# Local temporary and scratch data
+scratch/
+pmaports/
+*.elf
+*.o
+-.o
+opencode.txt
+BAHAN.txt
+boot1.jpg
+rmt_storage_moto
+fix_free.c
+

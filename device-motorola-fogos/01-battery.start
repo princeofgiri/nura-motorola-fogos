@@ -1,11 +1,9 @@
 #!/bin/sh
 # Fix battery detection in postmarketOS / UPower
-mkdir -p /run/fogos
-echo "Battery" > /run/fogos/battery_type
-if [ -f /sys/class/power_supply/qcom_battery/type ]; then
-    mount --bind /run/fogos/battery_type /sys/class/power_supply/qcom_battery/type
-    killall upowerd 2>/dev/null || true
-fi
+# Unmount any stale dummy type if mounted
+umount /sys/class/power_supply/qcom_battery/type 2>/dev/null || true
+umount $(readlink -f /sys/class/power_supply/qcom_battery)/type 2>/dev/null || true
+
 
 # Set Fast Charging Current (FCC) to 2.5A
 FCC="/sys/bus/iio/devices/iio:device5/in_current_main_constant_charge_current_max_input"

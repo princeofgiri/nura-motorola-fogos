@@ -1,0 +1,89 @@
+diff --git a/src/freedreno/vulkan/tu_device.cc b/src/freedreno/vulkan/tu_device.cc
+index e8ef940..1109d9a 100644
+--- a/src/freedreno/vulkan/tu_device.cc
++++ b/src/freedreno/vulkan/tu_device.cc
+@@ -353,7 +353,7 @@ get_device_extensions(const struct tu_physical_device *device,
+       .EXT_mutable_descriptor_type = true,
+       .EXT_nested_command_buffer = true,
+       .EXT_non_seamless_cube_map = true,
+-      .EXT_physical_device_drm = !is_kgsl(device->instance),
++      .EXT_physical_device_drm = true,
+       .EXT_pipeline_creation_cache_control = true,
+       .EXT_pipeline_creation_feedback = true,
+ #ifdef TU_USE_WSI_PLATFORM
+diff --git a/src/freedreno/vulkan/tu_knl_kgsl.cc b/src/freedreno/vulkan/tu_knl_kgsl.cc
+index 8b51fa2..2fbb67c 100644
+--- a/src/freedreno/vulkan/tu_knl_kgsl.cc
++++ b/src/freedreno/vulkan/tu_knl_kgsl.cc
+@@ -10,6 +10,8 @@
+ #include <stdint.h>
+ #include <sys/ioctl.h>
+ #include <sys/mman.h>
++#include <sys/stat.h>
++#include <sys/sysmacros.h>
+ 
+ #define __user
+ #include "ion/ion.h"
+@@ -1789,8 +1791,7 @@ VkResult
+ tu_knl_kgsl_load(struct tu_instance *instance, int fd)
+ {
+    if (instance->vk.enabled_extensions.KHR_display) {
+-      return vk_errorf(instance, VK_ERROR_INITIALIZATION_FAILED,
+-                       "I can't KHR_display");
++      mesa_logw("KHR_display is not supported on KGSL");
+    }
+ 
+    struct tu_physical_device *device = (struct tu_physical_device *)
+@@ -1858,6 +1859,31 @@ tu_knl_kgsl_load(struct tu_instance *instance, int fd)
+    device->local_fd = fd;
+    device->kgsl_dma_fd = dma_fd;
+ 
++   struct stat drm_st;
++   if (stat("/dev/dri/card0", &drm_st) == 0) {
++      device->has_master = true;
++      device->master_major = major(drm_st.st_rdev);
++      device->master_minor = minor(drm_st.st_rdev);
++   } else {
++      device->has_master = false;
++      device->master_major = 0;
++      device->master_minor = 0;
++   }
++
++   if (stat("/dev/dri/renderD128", &drm_st) == 0) {
++      device->has_local = true;
++      device->local_major = major(drm_st.st_rdev);
++      device->local_minor = minor(drm_st.st_rdev);
++   } else if (device->has_master) {
++      device->has_local = true;
++      device->local_major = device->master_major;
++      device->local_minor = device->master_minor;
++   } else {
++      device->has_local = false;
++      device->local_major = 0;
++      device->local_minor = 0;
++   }
++
+    device->dev_id.gpu_id =
+       ((info.chip_id >> 24) & 0xff) * 100 +
+       ((info.chip_id >> 16) & 0xff) * 10 +
+diff --git a/src/gallium/drivers/zink/zink_screen.c b/src/gallium/drivers/zink/zink_screen.c
+index 7efcbaa..0e24e54 100644
+--- a/src/gallium/drivers/zink/zink_screen.c
++++ b/src/gallium/drivers/zink/zink_screen.c
+@@ -1720,6 +1720,16 @@ zink_get_display_device(const struct zink_screen *screen, uint32_t pdev_count,
+          return i;
+    }
+ 
++   /* Fallback: if no device matches the DRM major/minor (e.g. on KGSL where
++    * the 3D GPU is on /dev/kgsl-3d0 and display controller is on /dev/dri/card0),
++    * select the first non-CPU physical device available. */
++   for (uint32_t i = 0; i < pdev_count; ++i) {
++      VkPhysicalDeviceProperties dev_props;
++      VKSCR(GetPhysicalDeviceProperties)(pdevs[i], &dev_props);
++      if (dev_props.deviceType != VK_PHYSICAL_DEVICE_TYPE_CPU)
++         return i;
++   }
++
+    return -1;
+ }
+ 

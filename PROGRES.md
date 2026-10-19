@@ -48,7 +48,6 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
       - Build APK sukses via `pmbootstrap build device-motorola-fogos --arch aarch64` (`device-motorola-fogos-3-r3.apk`).
 - [x] **Screen Sleep & Power Crash Resolved (16 Okt)**:
       - Layar sleep memicu reboot karena register access downstream SDE pada saat DPMS off.
-      - DPMS turn-off dinonaktifkan di `powerdevilrc`, `kglobalshortcutsrc`, dan `/etc/elogind/logind.conf.d/99-fogos-power.conf`. Device UI tetap aktif dan stabil tanpa reboot.
 - [x] **M7 — Wi-Fi WCN3990 & Dual-Band 2.4/5GHz Scanning ✔ SEMPURNA (16 Okt)**:
       - Driver Qualcomm WCN3990 (`qcacld-3.0` / `wlan.ko` + `icnss2`) membutuhkan userspace daemon `cnss-daemon` untuk melakukan handshake QMI, penyediaan MAC address, dan inisialisasi kalibrasi sebelum WLAN firmware menerbitkan event `FW_READY`.
       - Loop mount partisi stock vendor (`/mnt/stock_vendor`) dan stock system (`/mnt/stock_system`) dari partisi `super` (`/dev/sde25`) secara read-only.
@@ -58,6 +57,17 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
       - Stack daemon Android vendor (`vndservicemanager`, `pm-service`, `pm-proxy`, `cnss-daemon`) berhasil berjalan sepenuhnya secara native di postmarketOS.
       - `wlan0` terdaftar secara native di kernel dan NetworkManager, mendukung pemindaian dual-band 2.4GHz dan 5GHz (terdeteksi puluhan AP dengan sinyal penuh dan kecepatan hingga 1170 Mbit/s).
       - Seluruh stack dikemas ke dalam OpenRC service `fogos-wifi` di `device-motorola-fogos` (pkgver=3-r5).
+- [x] **M8 — Akselerasi Hardware GPU Penuh: Mesa Turnip-KGSL + Zink ✔ SEMPURNA (19 Okt)**:
+      - **Driver Mesa Turnip-KGSL**: Mesa 26.2.5 di-fork dan dikompilasi dengan `-Dfreedreno-kmds=msm,kgsl,virtio`. Driver Turnip Vulkan berhasil mengakses node `/dev/kgsl-3d0` secara native di kernel downstream 5.4.
+      - **Deteksi Hardware Adreno 619**: Terdeteksi penuh sebagai `Turnip Adreno (TM) 619`, Vulkan API 1.3.354 (Device ID `0x06010901`, Vendor ID `0x5143`, clock aktif 266 MHz).
+      - **Patch KMSRO & Fallback Zink (`zink-kgsl-kmsro.patch`)**:
+        - Memperbaiki Zink device picker (`zink_get_display_device`) agar otomatis memilih GPU non-CPU saat menjalankan KMSRO pada driver display `/dev/dri/card0` tanpa DRM render match.
+        - Mengaktifkan `VK_EXT_physical_device_drm` di Turnip KGSL dengan menautkan ID `/dev/dri/card0` dan `/dev/dri/renderD128`.
+        - Meniadakan fatal error pada `KHR_display` sehingga `vulkaninfo --summary` berjalan 100% mulus tanpa crash.
+      - **Benchmark & Hasil Desktop**:
+        - `glmark2-es2-wayland`: **260 FPS** (FrameTime: 3.856 ms) pada Wayland resolusi native (naik >15x lipat dibanding software rasterizer llvmpipe).
+        - KWin Wayland mengenali dan memilih render device `/dev/dri/renderD128: Turnip Adreno ™ 619` dan `/dev/dri/card0: zink Vulkan 1.3` sebagai GPU utama.
+        - CPU load turun drastis (load average 0.10) dan sistem berjalan stabil tanpa crash/reboot.
 - [ ] Berikutnya: Packet data attach (EPS/PS attach), mobile data routing rmnet_ipa0, audio internal routing.
 
 ## File port (kanonis, di `~/nura-fogos/`)
@@ -354,6 +364,18 @@ Jalur kernel: **downstream 5.4** dari LineageOS (`android_kernel_motorola_sm6375
   - Saat tombol power ditekan (layar OFF): Backlight dipulihkan seketika ke nilai semula (50%), menampilkan lockscreen PIN/jam/baterai.
   - Fitur **Double Tap to Wake (DT2W)** diaktifkan pada IC Ilitek (`echo 1 > /sys/devices/virtual/touchscreen/primary/gesture`). Ketukan 2x pada layar saat kondisi padam langsung membangunkan layar tanpa perlu menyentuh tombol power fisik.
   - Auto-sleep timer 120 detik: Jika ponsel tidak disentuh selama 2 menit, layar otomatis padam dan terkunci secara aman tanpa crash.
+
+- **GPU Bring-Up & Deteksi Adreno 619 (19 Okt)**:
+  - **Identifikasi Perangkat Keras**: SoC Snapdragon 695 5G (SM6375 / Blair) dilengkapi GPU **Qualcomm Adreno 619 v2** (`Adreno619v2`), Device ID 1, Chip ID `0x6010901`, Vulkan Device ID `0x6010901`, GMEM SRAM 512 KB (`0x80000`), frekuensi dinamis 266–900 MHz.
+  - **Penyebab Timeout / Error Awal**: Percobaan membuka `/dev/kgsl-3d0` sebelumnya mengalami hang 60 detik (`ETIMEDOUT 110`) karena kernel gagal memuat firmware SQE (`kgsl kgsl-3d0: request_firmware(a630_sqe.fw) failed: -110`).
+  - **Deployment Firmware**:
+    - Microcode SQE (`a630_sqe.fw`, 32 KB) dan GMU power microcontroller (`a619_gmu.bin`, 32 KB) disalin dari partisi vendor ke `/lib/firmware/` dan `/lib/firmware/qcom/`.
+    - Firmware Zap Shader (`a615_zap.mbn/.mdt/.b00/.b01/.b02`) dipasangkan untuk otentikasi TrustZone subsys-pil-tz.
+    - Kernel downstream berhasil mem-PIL Zap shader: `subsys-pil-tz soc:qcom,kgsl-hyp: a615_zap: Brought out of reset`, `pil_boot is successful from a615_zap`.
+  - **Udev Permissions**:
+    - Node `/dev/kgsl-3d0` awalnya berstatus `0600 root:root` sehingga tidak bisa diakses sesi non-root (`symbiot`).
+    - Dibuat `50-kgsl.rules` (`KERNEL=="kgsl-3d0", GROUP="video", MODE="0666"`) dan dimasukkan ke paket `device-motorola-fogos` (pkgrel 9).
+    - Akses ioctl KGSL (`IOCTL_KGSL_DEVICE_GETPROPERTY`) dari userspace biasa kini 100% sukses dan membaca properti Adreno 619 secara instan.
 
 ## Perintah penting
 

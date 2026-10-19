@@ -10,7 +10,7 @@ maintainer="Fogos Porter <fogos@example.com>"
 pkgname=device-motorola-fogos
 pkgdesc="Motorola Moto G34 5G"
 pkgver=3
-pkgrel=7
+pkgrel=11
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -18,6 +18,8 @@ replaces="postmarketos-base-ui-modemmanager-openrc"
 options="!check !archcheck"
 depends="
 	linux-motorola-fogos
+	firmware-motorola-fogos
+	mesa-vulkan-freedreno
 	make-dynpart-mappings
 	mkbootimg
 	msm-firmware-loader
@@ -51,7 +53,7 @@ source="
 	display.start
 	touchscreen.start
 	rmtfs.start
-	modem-setup.start
+	modemmanager.initd
 	net-route.start
 	99-subsys-ssr.rules
 	99-touchscreen.rules
@@ -69,6 +71,7 @@ source="
 	powerdevilrc
 	fogos-powerd.py
 	fogos-powerd.initd
+	50-kgsl.rules
 "
 
 build() {
@@ -111,7 +114,7 @@ package() {
 	install -Dm755 "$srcdir/display.start" "$pkgdir/etc/local.d/display.start"
 	install -Dm755 "$srcdir/touchscreen.start" "$pkgdir/etc/local.d/touchscreen.start"
 	install -Dm755 "$srcdir/rmtfs.start" "$pkgdir/etc/local.d/rmtfs.start"
-	install -Dm755 "$srcdir/modem-setup.start" "$pkgdir/etc/local.d/modem-setup.start"
+	install -Dm755 "$srcdir/modemmanager.initd" "$pkgdir/etc/init.d/modemmanager"
 	install -Dm755 "$srcdir/01-battery.start" "$pkgdir/etc/local.d/01-battery.start"
 	install -Dm755 "$srcdir/net-route.start" "$pkgdir/etc/local.d/net-route.start"
 
@@ -120,6 +123,7 @@ package() {
 	install -Dm644 "$srcdir/99-touchscreen.rules" "$pkgdir/etc/udev/rules.d/99-touchscreen.rules"
 	install -Dm644 "$srcdir/99-fogos-charger.rules" "$pkgdir/etc/udev/rules.d/99-fogos-charger.rules"
 	install -Dm644 "$srcdir/78-mm-rmnet-ipa.rules" "$pkgdir/etc/udev/rules.d/78-mm-rmnet-ipa.rules"
+	install -Dm644 "$srcdir/50-kgsl.rules" "$pkgdir/etc/udev/rules.d/50-kgsl.rules"
 	install -Dm644 "$srcdir/local-overrides.quirks" "$pkgdir/etc/libinput/local-overrides.quirks"
 
 	# Wayland / KWin display environment
@@ -148,7 +152,7 @@ b69aea17983e7a9a31b6a75029a2605feeafcde2be804e8d641f23a6543f526a212b52fedf005a65
 8c03d60bc585fa5e196619f15522b77f9541f33868a81d427cc51661f57b5c5ddef2d99dfb81fa5e5408d82076cad8f412d88462295250fa53df7f407b98f2b9  kernel-cmdline.conf
 8de6a560a9ba2a2128c7361204c8a20d31ecab27e8688a33d800b0cbe201f7270e2099e868db2e8caa95baab78d3a5e71a8e6e0a309894c10d4a95afa1f1b17d  modules-initfs
 38f95f4a9a8918cfb7728f78a43c8f65566cf9ef7a14789c3287574285bffea91678fa4e45122a6bfddcb40435b10f473269d11ae8739599cb34c2f3102ceffb  libqrtr-fix.c
-8b8a6cf35b76251791ec7f823b04cb8ce92ddfe8871910b3e3178d46546f89fb89b0be10bf9a8b975ed4fc079bdd7a14142317163e23b2470a51c81c5094b4a4  libmm-slot-fix.c
+a34e049e21c8c2041fbcbbc806898ddec3b6c788a8e57e12a7c03099d9de095685953838759c1f6b7ce8b88ca9af1a35835eb3879556ec70427f603f3956cb00  libmm-slot-fix.c
 1cd8be0a6c6a4bcb94f5ad06603d9348cf7d3208596b3f62fa717e60f735e60294fa3cd615cc41fbd27b1395aac05a44b276dd7688bcf4486de2088fdfa32ba1  pd-mapper.confd
 ce205c3b1670f615c159c961da632c4aa4bd1283925c664712f1ccb4fb924a40ec8ce5a6b6f986a88b64658682a66d6e96efc4dd0cc9f309439211d49156486d  tqftpserv.confd
 ee68e905a3612ed533a81fd5a0faa39777aa24cdf164b2c669f14645543ee983ee5ddb3ad344ac69767ab1e5d9462f03ecefc304feade903f60e0b6528843220  rmtfs.confd
@@ -158,22 +162,23 @@ ee68e905a3612ed533a81fd5a0faa39777aa24cdf164b2c669f14645543ee983ee5ddb3ad344ac69
 cd4792f985fe2a7408a893f002f8b2b6b03ac2325d6d550d22fe613b54cde5d8c8aab18a033b930af82b2f300530a8607dbc6db4451def20d2ef0779510a996d  display.start
 72a9d9c59099023c15e1e29014c2fcb35d59b81d1441708e6339f4361df7587968c8b308e2a42b6139ceb3697732a2aa5df290ae2d3d3ce1b111ab15576cb509  touchscreen.start
 bf76bbcf8e78c815e249320c179040e802eb24a566d93a0b99044e342517e41d8edcb5362627f2b221042249b2dab01ef5f927c2bcd2849e882de78982baf10b  rmtfs.start
-b4e863f519e9ec79286b21673da4284801e5f27f939e212588a798666339e8f9b5fc0dc629d1ef387343c6678510beec751c449e20d35c236f131f4f970b665a  modem-setup.start
+f7ca354e687e9c9b394616f583d79f5ac696ce6421d36d6e18ccd8dd93d4e5927796d1ea61677fcbf6062814876c7e2515a74ddb73a2f7fdd47bd1b34ca9a1e8  modemmanager.initd
 0ae0f1d45ab1565cfa9f92dc7037958aabc20a324cb4be846b7fbf378bf2388fc617cfa563c6d81ad759f42232f7aa7a0490d4077c1f75ba03080010840ffd7e  net-route.start
 d4725817f021dd1f81672c4b47d6fe1d31b5e174dcdb607c40e3764507901e54f26e21f3c320e61fc07bc8c3c8ec59767f322e630d76b5f150330e65e52f5a63  99-subsys-ssr.rules
 1972aa4b386f883f099dfd85f9b12ca4f14b2db23e54abd7ba7c5c069c2272d3c29acde2362a335f2f29124343b7ab4b2f897be3e65948efdf35cdbbef9dc419  99-touchscreen.rules
 4b33b81ac7a09beef965e86f8e47f1e96cc15f84ad54b1cd56bb9370c6deaaef285e7018b54125aa7c6fe9cddea8d137c1a73baea580b14a27dba95c16f56d4c  99-fogos-charger.rules
-e19de4a8de5d58e51f9028506ca95100d4f672fd80d36c3641f246250e2ffafb6f643a564f61cc7dcf6e731befad0f15676aef7eaadef8f66515871fab7da9fd  78-mm-rmnet-ipa.rules
+24b6ead662262b4194e7148bfe39404fdd85bb46234180ce9775c7fe73f8ceb70e7350556be1bd8a8c009f3c072b6f7eb6637fe732d2d92ab0c80460f30779c5  78-mm-rmnet-ipa.rules
 d7d386a254cbd858d90a69c93f8be85da4dd3412619fe92b20cf4356cb88e3c9ace7ad8020e76e7ed480d06a722d04999a4a97befc51ebe33f5a24405721ecb0  local-overrides.quirks
-d484a043907189a302b1d07f984af68e0b26e0a2b2a74b096646ff5107e634acca41c7362b0388ed0183011ec02252f4c8a5e0f39182df9085620682f325b72a  00-kwin.sh
+baff6464228a492756c569dfcd6cb0041b7f8b1d65cec6016065a9d2d3e3835691b12ea37899300607a2993ba35fe4d5569983289acd64c8c94b7327bfbcabb6  00-kwin.sh
 8ad7c4683177218d8005402336260cdfc23d5ff958a7ee19e44f34036f9f18559db3588f572093dd85f5ecf8335696d3c457bf297b361adf6497ecd741069445  99-fogos-power.conf
 bdfe755ca155de4bbb6bf7a084539990255973a119a2058e35add8088b790830613924c01d23b7c74cce8b9a061b2ec03382fc8b986f1683288b115c6f002765  android-log-catcher.c
 bf0132863dc338a46b2ffbecb98214a88d25897d12bba94f88e9a238121d77868e9e38063965f9a2b9d80e83e5ea849bb779c6bea00d75a74d289977744528f1  fogos-patch.py
 f00c8ca534d2e64e8504fadc2e8c8a2a4fb9a9ae6e164f7fa8d4bf9d305ef72a4a3b402b363daf8d553f8f89dd25fad7253bd394fd323a78da5892ae7a215fee  wifi-prepare.sh
-b20e8d25c6203cb614a5a368bfef5f297ef07826517d5a984b5a36ea67d767c243c7fc40d6bc3477aa07a3a1b16bdf817b0e8920af98c6b403902c8e9908bb48  fogos-wifi.initd
+92fa58d70bf26a46429f3ca136c8446c5721ac5f669b8d82088b75961e73d4b5f956f1bbd8018e91a11b07fb3dabde1d6e113c013474a0296a72f95fcdbd94cb  fogos-wifi.initd
 3582f1f78a697f95dc80e990d507a5f004b46c9220eafa87b1f94a9a88aa61f2a27831669639a07017f10375a90fb943254271e91fb21e3f43b0fdfeeb2be92a  50-fogos.pa
-5d7897caaf5265dbb898c59769eec99588743e2beac9a2a54773685de0ca9131838a71f77256218d198891338de62bf123131e78d6275401321a0a709ef554ff  01-battery.start
+de190d7ebd4f4fa03fabd2fb8f0aa78d8d5260d668ecfb09c393e00f34321f5a2902b35e6d906fac0dc2169ed9d536cf5a03e6db24ae96920104469bcf6181fe  01-battery.start
 fe3c2c65aebd0dee5c1d2aad6fc4cca2ff29603e19d7fcbcaf1d93a63b1af16ff00b12f39a08267fd33b222939ae059f5c63feb671288bf9e64834cbec0a9c86  powerdevilrc
 4432e5143b9b25a6778c9129d5088c921af2956eddbf3295f56abdb1e0d29d0c8e2b71dc1bc746e14ecf05e50feb4189ab5e8b8830cd1d25842e7671c6cc552e  fogos-powerd.py
 1a1add2f1177e5e896cd72dbaa3e8d9025f9e93949cd557ffee8c40e454246f0a76ce1e505f612f0b50136fad33bb889393c6e097aedb7473268c4bcf80bfa1b  fogos-powerd.initd
+e513df93eddb9a01344103a7c2d3d07babd33767083ff66007086d091cf709ba929e7686a34cbbc403197b4ab5c0e9c8cf3e138a149b96839ecb348b16ff06e5  50-kgsl.rules
 "

@@ -42,6 +42,36 @@ start() {
         echo ON > /dev/wlan 2>/dev/null || true
     fi
 
+    # Wait for wlan0 interface to be registered by WLAN driver
+    for i in $(seq 1 30); do
+        [ -d /sys/class/net/wlan0 ] && break
+        sleep 0.5
+    done
+
+    # Unblock rfkill for Wi-Fi
+    rfkill unblock wifi 2>/dev/null || true
+    rfkill unblock all 2>/dev/null || true
+
+    # Ensure NetworkManager state file has WirelessEnabled=true
+    if [ -f /var/lib/NetworkManager/NetworkManager.state ]; then
+        sed -i 's/WirelessEnabled=false/WirelessEnabled=true/' /var/lib/NetworkManager/NetworkManager.state 2>/dev/null || true
+    fi
+
+    # Ensure NetworkManager radio is on after NM starts
+    (
+        for i in $(seq 1 30); do
+            if nmcli general status >/dev/null 2>&1; then
+                rfkill unblock wifi 2>/dev/null || true
+                nmcli radio wifi on 2>/dev/null || true
+                nmcli dev set wlan0 autoconnect yes 2>/dev/null || true
+                sleep 2
+                nmcli dev wifi rescan 2>/dev/null || true
+                break
+            fi
+            sleep 1
+        done
+    ) >/dev/null 2>&1 &
+
     eend 0
 }
 

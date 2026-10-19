@@ -1,0 +1,5 @@
+# Qualcomm Adreno KGSL GPU device permissions
+KERNEL=="kgsl-3d0", GROUP="video", MODE="0666"
+SUBSYSTEM=="misc", KERNEL=="ion", GROUP="video", MODE="0666"
+KERNEL=="ion", GROUP="video", MODE="0666"
+

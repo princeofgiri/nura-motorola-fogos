@@ -9,7 +9,7 @@
 maintainer="Fogos Porter <fogos@example.com>"
 pkgname=firmware-motorola-fogos
 pkgver=2
-pkgrel=0
+pkgrel=1
 pkgdesc="Firmware for Motorola Moto G34 5G"
 url="https://github.com/TheMuppets/proprietary_vendor_motorola_fogos"
 arch="aarch64"
@@ -33,11 +33,15 @@ package() {
 	done
 
 	# Adreno (a619 gmu, a630 sqe) from the sm6375-common tree
+	# Downstream kernel requests direct /lib/firmware/<blob>, while mainline uses /lib/firmware/qcom/
 	_common_dir="$builddir"/proprietary_vendor_motorola_sm6375-common-$_common_commit
 	install -Dm644 "$_common_dir"/proprietary/vendor/firmware/a619_gmu.bin \
-		-t "$pkgdir"/lib/firmware/qcom/
+		-t "$pkgdir"/lib/firmware/
 	install -Dm644 "$_common_dir"/proprietary/vendor/firmware/a630_sqe.fw \
-		-t "$pkgdir"/lib/firmware/qcom/
+		-t "$pkgdir"/lib/firmware/
+	mkdir -p "$pkgdir"/lib/firmware/qcom
+	ln -sf ../a619_gmu.bin "$pkgdir"/lib/firmware/qcom/a619_gmu.bin
+	ln -sf ../a630_sqe.fw "$pkgdir"/lib/firmware/qcom/a630_sqe.fw
 }
 
 sha512sums="

@@ -1,0 +1,97 @@
+#!/sbin/openrc-run
+
+supervisor=supervise-daemon
+command=/usr/sbin/ModemManager
+command_args="--debug ${modemmanager_opts}"
+command_env="LD_PRELOAD=/usr/lib/libmm-slot-fix.so"
+output_log="/var/log/modemmanager.log"
+error_log="/var/log/modemmanager.log"
+
+description="ModemManager Daemon"
+
+depend() {
+    need dbus pd-mapper tqftpserv rmtfs
+    before networkmanager
+}
+
+start_pre() {
+    SLOT=$(grep -o 'androidboot.slot_suffix=_[ab]' /proc/cmdline 2>/dev/null | cut -d= -f2)
+    [ -z "$SLOT" ] && SLOT="_b"
+
+    # 1. Setup FSG and carrier partitions
+    FSG_DEV="/dev/disk/by-partlabel/fsg${SLOT}"
+    [ -e "$FSG_DEV" ] || FSG_DEV="/dev/disk/by-partlabel/fsg_a"
+    ln -sf "$FSG_DEV" /dev/disk/by-partlabel/modem_fsg 2>/dev/null || true
+    ln -sf /dev/disk/by-partlabel/fsc /dev/disk/by-partlabel/modem_fsc 2>/dev/null || true
+    ln -sf /dev/disk/by-partlabel/modemst1 /dev/disk/by-partlabel/modem_fs1 2>/dev/null || true
+    ln -sf /dev/disk/by-partlabel/modemst2 /dev/disk/by-partlabel/modem_fs2 2>/dev/null || true
+
+    mkdir -p /mnt/fsg /vendor/fsg /readonly/vendor/fsg /lib/firmware/fsg
+    mountpoint -q /mnt/fsg || mount -t ext4 -o ro "$FSG_DEV" /mnt/fsg 2>/dev/null || true
+    mountpoint -q /vendor/fsg || mount --bind /mnt/fsg /vendor/fsg 2>/dev/null || true
+    mountpoint -q /readonly/vendor/fsg || mount --bind /mnt/fsg /readonly/vendor/fsg 2>/dev/null || true
+    mountpoint -q /lib/firmware/fsg || mount --bind /mnt/fsg /lib/firmware/fsg 2>/dev/null || true
+
+    # 2. Setup firmware links
+    MODEM_DIR="/run/msm-firmware-loader/mnt/modem${SLOT}"
+    [ -d "$MODEM_DIR/image" ] || MODEM_DIR=$(ls -d /run/msm-firmware-loader/mnt/modem_* 2>/dev/null | head -n1)
+
+    if [ -n "$MODEM_DIR" ] && [ -d "$MODEM_DIR/image" ]; then
+        mkdir -p /firmware /readonly/firmware /readonly/vendor/firmware_mnt /var/lib/tqftpserv
+        ln -sfn "$MODEM_DIR/image" /firmware/image
+        ln -sfn "$MODEM_DIR/image" /readonly/firmware/image
+        ln -sfn "$MODEM_DIR/image" /readonly/vendor/firmware_mnt/image
+        ln -sfn "$MODEM_DIR/image" /lib/firmware/image
+        ln -sfn "$MODEM_DIR/image/modem_pr" /lib/firmware/modem_pr
+        ln -sfn "$MODEM_DIR/image" /var/lib/tqftpserv/image
+        ln -sfn "$MODEM_DIR/image/modem_pr" /var/lib/tqftpserv/modem_pr
+        cp -n "$MODEM_DIR/image"/*.jsn /lib/firmware/ 2>/dev/null || true
+        ln -sf /lib/firmware/wlanmdsp.mbn /var/lib/tqftpserv/ 2>/dev/null || true
+
+        mkdir -p /sys/class/remoteproc/remoteproc0 /sys/class/remoteproc/remoteproc1
+        echo wlanmdsp.mbn > /sys/class/remoteproc/remoteproc0/firmware 2>/dev/null || true
+        echo modem.mbn > /sys/class/remoteproc/remoteproc1/firmware 2>/dev/null || true
+    fi
+
+    # 3. Wait for rmnet_ipa0 net interface to appear
+    for i in $(seq 1 45); do
+        [ -d /sys/class/net/rmnet_ipa0 ] && break
+        sleep 0.5
+    done
+
+    # Setup ModemManager IPA sysfs link
+    mkdir -p /tmp/mm_qmapmux_sysfs
+    ln -sf /sys/devices/virtual/net/rmnet_ipa0 /tmp/mm_qmapmux_sysfs/lower_rmnet_ipa0 2>/dev/null || true
+
+    # 4. Wait for QRTR node 0 and modem QMI responsiveness
+    for i in $(seq 1 30); do
+        if /usr/sbin/qmicli -d qrtr://0 --dms-get-operating-mode >/dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+    done
+
+    # 5. Synchronous SIM card provisioning loop
+    for i in $(seq 1 45); do
+        status=$(/usr/sbin/qmicli -d qrtr://0 --uim-get-card-status 2>/dev/null)
+        if echo "$status" | grep -q "Application state: 'ready'"; then
+            /usr/sbin/qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1 || true
+            break
+        elif echo "$status" | grep -q "Application state: 'detected'"; then
+            AID=$(echo "$status" | awk '/Application ID:/{getline; gsub(/[: \t]/,""); print $1; exit}')
+            [ -z "$AID" ] && AID="A0000000871002FF62F00189000001FF"
+            /usr/sbin/qmicli -d qrtr://0 --uim-change-provisioning-session="session-type=primary-gw-provisioning,activate=yes,slot=1,aid=$AID" >/dev/null 2>&1 || true
+            /usr/sbin/qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1 || true
+        fi
+        sleep 1
+    done
+
+    # Final guarantee: ensure baseband is online
+    /usr/sbin/qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1 || true
+
+    return 0
+}
+
+stop_post() {
+    killall -9 ModemManager.real 2>/dev/null || true
+}

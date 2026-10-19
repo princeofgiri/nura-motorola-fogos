@@ -58,7 +58,7 @@ mount --bind /mnt/stock_vendor/etc /vendor/etc 2>/dev/null || true
 
 # 4. Patch libbinder and vndservicemanager if needed
 if [ -f /usr/lib/fogos-patch.py ]; then
-    python3 /usr/lib/fogos-patch.py
+    python3 /usr/lib/fogos-patch.py || true
 fi
 
 # 5. MAC address and persist config
@@ -74,3 +74,17 @@ Intf1MacAddress=00FADE53F563
 MACEOD
     chmod 644 /mnt/vendor/persist/wlan_mac.bin
 fi
+
+# 6. Disable WLAN idle shutdown to prevent assertion panic (must be BEFORE 'END' marker)
+for ini in /vendor/firmware/wlan/qca_cld/WCNSS_qcom_cfg.ini /vendor/firmware/wlan/qca_cld/WCNSS_mot_cfg.ini /lib/firmware/wlan/qca_cld/WCNSS_qcom_cfg.ini /lib/firmware/wlan/qca_cld/WCNSS_mot_cfg.ini; do
+    if [ -f "$ini" ]; then
+        sed -i '/gInterfaceChangeWait/d' "$ini"
+        sed -i '/gWlanAutoShutdown/d' "$ini"
+        if grep -q "^END" "$ini"; then
+            sed -i '/^END/i gInterfaceChangeWait=0\ngWlanAutoShutdown=0' "$ini"
+        else
+            echo "gInterfaceChangeWait=0" >> "$ini"
+            echo "gWlanAutoShutdown=0" >> "$ini"
+        fi
+    fi
+done

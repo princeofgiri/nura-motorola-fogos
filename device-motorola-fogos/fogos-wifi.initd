@@ -48,6 +48,9 @@ start() {
         sleep 0.5
     done
 
+    # Bring up wlan0 link state
+    ip link set wlan0 up 2>/dev/null || true
+
     # Unblock rfkill for Wi-Fi
     rfkill unblock wifi 2>/dev/null || true
     rfkill unblock all 2>/dev/null || true
@@ -56,21 +59,6 @@ start() {
     if [ -f /var/lib/NetworkManager/NetworkManager.state ]; then
         sed -i 's/WirelessEnabled=false/WirelessEnabled=true/' /var/lib/NetworkManager/NetworkManager.state 2>/dev/null || true
     fi
-
-    # Ensure NetworkManager radio is on after NM starts
-    (
-        for i in $(seq 1 30); do
-            if nmcli general status >/dev/null 2>&1; then
-                rfkill unblock wifi 2>/dev/null || true
-                nmcli radio wifi on 2>/dev/null || true
-                nmcli dev set wlan0 autoconnect yes 2>/dev/null || true
-                sleep 2
-                nmcli dev wifi rescan 2>/dev/null || true
-                break
-            fi
-            sleep 1
-        done
-    ) >/dev/null 2>&1 &
 
     eend 0
 }

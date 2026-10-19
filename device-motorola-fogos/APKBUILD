@@ -10,11 +10,11 @@ maintainer="Fogos Porter <fogos@example.com>"
 pkgname=device-motorola-fogos
 pkgdesc="Motorola Moto G34 5G"
 pkgver=3
-pkgrel=11
+pkgrel=13
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
-replaces="postmarketos-base-ui-modemmanager-openrc"
+replaces="postmarketos-base-ui-modemmanager-openrc rmtfs-openrc modemmanager-openrc"
 options="!check !archcheck"
 depends="
 	linux-motorola-fogos
@@ -72,6 +72,8 @@ source="
 	fogos-powerd.py
 	fogos-powerd.initd
 	50-kgsl.rules
+	rmnet-setup.c
+	99-network-autoconnect.start
 "
 
 build() {
@@ -91,6 +93,9 @@ build() {
 
 	# Build android-log-catcher
 	${CC:-gcc} $CFLAGS $CPPFLAGS $LDFLAGS -O2 -o "$srcdir/android-log-catcher" "$srcdir/android-log-catcher.c"
+
+	# Build rmnet-setup
+	${CC:-gcc} $CFLAGS $CPPFLAGS $LDFLAGS -O2 -o "$srcdir/rmnet-setup" "$srcdir/rmnet-setup.c"
 }
 
 package() {
@@ -117,6 +122,7 @@ package() {
 	install -Dm755 "$srcdir/modemmanager.initd" "$pkgdir/etc/init.d/modemmanager"
 	install -Dm755 "$srcdir/01-battery.start" "$pkgdir/etc/local.d/01-battery.start"
 	install -Dm755 "$srcdir/net-route.start" "$pkgdir/etc/local.d/net-route.start"
+	install -Dm755 "$srcdir/99-network-autoconnect.start" "$pkgdir/etc/local.d/99-network-autoconnect.start"
 
 	# Udev rules and libinput quirks
 	install -Dm644 "$srcdir/99-subsys-ssr.rules" "$pkgdir/etc/udev/rules.d/99-subsys-ssr.rules"
@@ -146,6 +152,9 @@ package() {
 
 	# PulseAudio audio configuration
 	install -Dm644 "$srcdir/50-fogos.pa" "$pkgdir/etc/pulse/default.pa.d/50-fogos.pa"
+
+	# RMNET IPA WAN initialization helper
+	install -Dm755 "$srcdir/rmnet-setup" "$pkgdir/usr/bin/rmnet-setup"
 }
 sha512sums="
 b69aea17983e7a9a31b6a75029a2605feeafcde2be804e8d641f23a6543f526a212b52fedf005a6541e28c5a1eda1d9923af98b8c132e4b98dd6b53319757857  deviceinfo
@@ -162,23 +171,25 @@ ee68e905a3612ed533a81fd5a0faa39777aa24cdf164b2c669f14645543ee983ee5ddb3ad344ac69
 cd4792f985fe2a7408a893f002f8b2b6b03ac2325d6d550d22fe613b54cde5d8c8aab18a033b930af82b2f300530a8607dbc6db4451def20d2ef0779510a996d  display.start
 72a9d9c59099023c15e1e29014c2fcb35d59b81d1441708e6339f4361df7587968c8b308e2a42b6139ceb3697732a2aa5df290ae2d3d3ce1b111ab15576cb509  touchscreen.start
 bf76bbcf8e78c815e249320c179040e802eb24a566d93a0b99044e342517e41d8edcb5362627f2b221042249b2dab01ef5f927c2bcd2849e882de78982baf10b  rmtfs.start
-f7ca354e687e9c9b394616f583d79f5ac696ce6421d36d6e18ccd8dd93d4e5927796d1ea61677fcbf6062814876c7e2515a74ddb73a2f7fdd47bd1b34ca9a1e8  modemmanager.initd
-0ae0f1d45ab1565cfa9f92dc7037958aabc20a324cb4be846b7fbf378bf2388fc617cfa563c6d81ad759f42232f7aa7a0490d4077c1f75ba03080010840ffd7e  net-route.start
+4462897bbec4242803bdb9a694ca01c79060cde3a13a967a5216d3fed3da2b3a0a8702fda52cbf8d9b114380b5120d3a314e8057af1690c2dc3c17a53023cea2  modemmanager.initd
+10185acca92623ffb3439cb70f9cf61d12e4565d790b5923e2052e452f6f92f5756bef593a99e177a8e5d02ff777b4021cad96345f43f13fe475856f9bd9402d  net-route.start
 d4725817f021dd1f81672c4b47d6fe1d31b5e174dcdb607c40e3764507901e54f26e21f3c320e61fc07bc8c3c8ec59767f322e630d76b5f150330e65e52f5a63  99-subsys-ssr.rules
 1972aa4b386f883f099dfd85f9b12ca4f14b2db23e54abd7ba7c5c069c2272d3c29acde2362a335f2f29124343b7ab4b2f897be3e65948efdf35cdbbef9dc419  99-touchscreen.rules
 4b33b81ac7a09beef965e86f8e47f1e96cc15f84ad54b1cd56bb9370c6deaaef285e7018b54125aa7c6fe9cddea8d137c1a73baea580b14a27dba95c16f56d4c  99-fogos-charger.rules
-24b6ead662262b4194e7148bfe39404fdd85bb46234180ce9775c7fe73f8ceb70e7350556be1bd8a8c009f3c072b6f7eb6637fe732d2d92ab0c80460f30779c5  78-mm-rmnet-ipa.rules
+c1fe0209fa9e408b48711b7aecfff309b91aa9d79dba7f799e66e5c9a9a2af430843d964fefd3cb5c3d2122d0fd57c8bace2c33400d6ed6b8dc7b2192f7c212f  78-mm-rmnet-ipa.rules
 d7d386a254cbd858d90a69c93f8be85da4dd3412619fe92b20cf4356cb88e3c9ace7ad8020e76e7ed480d06a722d04999a4a97befc51ebe33f5a24405721ecb0  local-overrides.quirks
 baff6464228a492756c569dfcd6cb0041b7f8b1d65cec6016065a9d2d3e3835691b12ea37899300607a2993ba35fe4d5569983289acd64c8c94b7327bfbcabb6  00-kwin.sh
 8ad7c4683177218d8005402336260cdfc23d5ff958a7ee19e44f34036f9f18559db3588f572093dd85f5ecf8335696d3c457bf297b361adf6497ecd741069445  99-fogos-power.conf
 bdfe755ca155de4bbb6bf7a084539990255973a119a2058e35add8088b790830613924c01d23b7c74cce8b9a061b2ec03382fc8b986f1683288b115c6f002765  android-log-catcher.c
 bf0132863dc338a46b2ffbecb98214a88d25897d12bba94f88e9a238121d77868e9e38063965f9a2b9d80e83e5ea849bb779c6bea00d75a74d289977744528f1  fogos-patch.py
-f00c8ca534d2e64e8504fadc2e8c8a2a4fb9a9ae6e164f7fa8d4bf9d305ef72a4a3b402b363daf8d553f8f89dd25fad7253bd394fd323a78da5892ae7a215fee  wifi-prepare.sh
-92fa58d70bf26a46429f3ca136c8446c5721ac5f669b8d82088b75961e73d4b5f956f1bbd8018e91a11b07fb3dabde1d6e113c013474a0296a72f95fcdbd94cb  fogos-wifi.initd
+77f7948b0e32c6d5b402abaf5dc6a6e818b06128d9b5a8014dd6ac5a6a1f807f74f17fd516822da4069999849ce8cbb42c4d57069bc8d4a7dcdd4752f4496278  wifi-prepare.sh
+34e8a770cde706af3688602c8d37f1d4857f7f843f8c28d991d7f5d66d98b9a5f3e52874f26120334e0ea1313b770434d148756b72142c537a88f68ae1ec77a4  fogos-wifi.initd
 3582f1f78a697f95dc80e990d507a5f004b46c9220eafa87b1f94a9a88aa61f2a27831669639a07017f10375a90fb943254271e91fb21e3f43b0fdfeeb2be92a  50-fogos.pa
 de190d7ebd4f4fa03fabd2fb8f0aa78d8d5260d668ecfb09c393e00f34321f5a2902b35e6d906fac0dc2169ed9d536cf5a03e6db24ae96920104469bcf6181fe  01-battery.start
 fe3c2c65aebd0dee5c1d2aad6fc4cca2ff29603e19d7fcbcaf1d93a63b1af16ff00b12f39a08267fd33b222939ae059f5c63feb671288bf9e64834cbec0a9c86  powerdevilrc
 4432e5143b9b25a6778c9129d5088c921af2956eddbf3295f56abdb1e0d29d0c8e2b71dc1bc746e14ecf05e50feb4189ab5e8b8830cd1d25842e7671c6cc552e  fogos-powerd.py
 1a1add2f1177e5e896cd72dbaa3e8d9025f9e93949cd557ffee8c40e454246f0a76ce1e505f612f0b50136fad33bb889393c6e097aedb7473268c4bcf80bfa1b  fogos-powerd.initd
 e513df93eddb9a01344103a7c2d3d07babd33767083ff66007086d091cf709ba929e7686a34cbbc403197b4ab5c0e9c8cf3e138a149b96839ecb348b16ff06e5  50-kgsl.rules
+7962bf2c90172c158d3691c483469a81182f939da8536ce5c4d300191f7d58daa31620caac93d9351b04dc0ccedd57e4252ac378bd19f581de176a71db7c69a0  rmnet-setup.c
+38385d1eb7788940e7e22cbb02da8439e13d925cc73e2b43990a0b4bf58df1ae60ab66c436e8f420fa93837303c811e7b4c76032c1a92942a8894a6601466d5d  99-network-autoconnect.start
 "

@@ -1,3 +1,5 @@
 #!/bin/sh
-ip route add default via 172.16.42.2 dev usb0 metric 1000 2>/dev/null || true
-echo "nameserver 1.1.1.1" > /etc/resolv.conf
+ip route add default via 172.16.42.2 dev usb0 metric 25000 2>/dev/null || true
+if [ ! -s /etc/resolv.conf ]; then
+    echo "nameserver 1.1.1.1" > /etc/resolv.conf
+fi

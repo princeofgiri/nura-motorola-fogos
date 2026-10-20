@@ -1,3 +1,0 @@
-#!/bin/sh
-# fogos: EFS for modem (foreground rmtfs blocks local.d, background it)
-rmtfs -r -P &

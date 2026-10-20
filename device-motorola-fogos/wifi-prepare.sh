@@ -12,28 +12,27 @@ for b in binder vndbinder hwbinder; do
     [ -e "/dev/binderfs/$b" ] && chmod 0666 "/dev/binderfs/$b"
 done
 
-# 2. Super partition loop mounts
-SUPER_DEV="/dev/disk/by-partlabel/super"
-[ -e "$SUPER_DEV" ] || SUPER_DEV="/dev/sde25"
+# 2. Stock System & Vendor mounts (prefer device-mapper devices)
+SLOT=$(grep -o 'androidboot.slot_suffix=_[ab]' /proc/cmdline 2>/dev/null | cut -d= -f2)
+[ -z "$SLOT" ] && SLOT="_b"
+SLOT_LETTER=$(echo "$SLOT" | tr -d '_')
 
 mkdir -p /mnt/stock_system /mnt/stock_vendor /apex/com.android.runtime /run/fogos
 
-# System (offset 3464288 sectors = 1773715456, size 2302248 sectors = 1178750976)
 if ! mountpoint -q /mnt/stock_system; then
-    LOOP_SYS=$(losetup -j "$SUPER_DEV" | grep "1773715456" | cut -d: -f1 | head -n1)
-    if [ -z "$LOOP_SYS" ]; then
-        LOOP_SYS=$(losetup -r -f -o 1773715456 --sizelimit 1178750976 "$SUPER_DEV" --show)
+    SYS_DEV="/dev/mapper/system_${SLOT_LETTER}"
+    [ -b "$SYS_DEV" ] || SYS_DEV="/dev/mapper/system_a"
+    if [ -b "$SYS_DEV" ]; then
+        mount -t ext4 -o ro "$SYS_DEV" /mnt/stock_system 2>/dev/null || true
     fi
-    mount -t ext4 -o ro "$LOOP_SYS" /mnt/stock_system
 fi
 
-# Vendor (offset 6929312 sectors = 3547807744, size 1455736 sectors = 745336832)
 if ! mountpoint -q /mnt/stock_vendor; then
-    LOOP_VND=$(losetup -j "$SUPER_DEV" | grep "3547807744" | cut -d: -f1 | head -n1)
-    if [ -z "$LOOP_VND" ]; then
-        LOOP_VND=$(losetup -r -f -o 3547807744 --sizelimit 745336832 "$SUPER_DEV" --show)
+    VND_DEV="/dev/mapper/vendor_${SLOT_LETTER}"
+    [ -b "$VND_DEV" ] || VND_DEV="/dev/mapper/vendor_a"
+    if [ -b "$VND_DEV" ]; then
+        mount -t ext4 -o ro "$VND_DEV" /mnt/stock_vendor 2>/dev/null || true
     fi
-    mount -t ext4 -o ro "$LOOP_VND" /mnt/stock_vendor
 fi
 
 # Android runtime APEX payload
@@ -75,16 +74,29 @@ MACEOD
     chmod 644 /mnt/vendor/persist/wlan_mac.bin
 fi
 
-# 6. Disable WLAN idle shutdown to prevent assertion panic (must be BEFORE 'END' marker)
+# 6. Disable WLAN idle shutdown and RRM beacon reports to prevent assertion panic (must be BEFORE 'END' marker)
 for ini in /vendor/firmware/wlan/qca_cld/WCNSS_qcom_cfg.ini /vendor/firmware/wlan/qca_cld/WCNSS_mot_cfg.ini /lib/firmware/wlan/qca_cld/WCNSS_qcom_cfg.ini /lib/firmware/wlan/qca_cld/WCNSS_mot_cfg.ini; do
     if [ -f "$ini" ]; then
         sed -i '/gInterfaceChangeWait/d' "$ini"
         sed -i '/gWlanAutoShutdown/d' "$ini"
+        sed -i '/gRrmEnable/d' "$ini"
         if grep -q "^END" "$ini"; then
-            sed -i '/^END/i gInterfaceChangeWait=0\ngWlanAutoShutdown=0' "$ini"
+            sed -i '/^END/i gInterfaceChangeWait=0\ngWlanAutoShutdown=0\ngRrmEnable=0' "$ini"
         else
             echo "gInterfaceChangeWait=0" >> "$ini"
             echo "gWlanAutoShutdown=0" >> "$ini"
+            echo "gRrmEnable=0" >> "$ini"
         fi
     fi
 done
+
+# 7. Fix Plasma Mobile SignalStrengthIndicator.qml duplicate GSM icon and qmldir resource override
+QMLDIR="/usr/lib/qt6/qml/org/kde/plasma/private/mobileshell/qmldir"
+[ -f "$QMLDIR" ] && sed -i 's/^prefer/#prefer/' "$QMLDIR" 2>/dev/null || true
+
+QML_INDICATOR="/usr/lib/qt6/qml/org/kde/plasma/private/mobileshell/SignalStrengthIndicator.qml"
+if [ -f "$QML_INDICATOR" ]; then
+    sed -i 's/visible: (!isInternetIndicatorMobileData.*/visible: !isInternetIndicatorMobileData \&\& MobileShell.SignalStrengthInfo.showIndicator/g' "$QML_INDICATOR" 2>/dev/null || true
+fi
+
+

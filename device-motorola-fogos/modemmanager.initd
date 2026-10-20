@@ -1,9 +1,8 @@
 #!/sbin/openrc-run
 
 supervisor=supervise-daemon
-command=/usr/sbin/ModemManager
-command_args="--debug ${modemmanager_opts}"
-command_env="LD_PRELOAD=/usr/lib/libmm-slot-fix.so"
+command=/usr/share/fogos/modemmanager-wrapper.sh
+command_args="${modemmanager_opts}"
 output_log="/var/log/modemmanager.log"
 error_log="/var/log/modemmanager.log"
 
@@ -47,59 +46,15 @@ start_pre() {
         ln -sfn "$MODEM_DIR/image/modem_pr" /var/lib/tqftpserv/modem_pr
         cp -n "$MODEM_DIR/image"/*.jsn /lib/firmware/ 2>/dev/null || true
         ln -sf /lib/firmware/wlanmdsp.mbn /var/lib/tqftpserv/ 2>/dev/null || true
-
-        mkdir -p /sys/class/remoteproc/remoteproc0 /sys/class/remoteproc/remoteproc1
-        echo wlanmdsp.mbn > /sys/class/remoteproc/remoteproc0/firmware 2>/dev/null || true
-        echo modem.mbn > /sys/class/remoteproc/remoteproc1/firmware 2>/dev/null || true
     fi
 
-    # 3. Wait for rmnet_ipa0 net interface to appear
-    for i in $(seq 1 45); do
-        [ -d /sys/class/net/rmnet_ipa0 ] && break
-        sleep 0.5
-    done
-
-    # Setup ModemManager IPA sysfs link
+    # 3. Setup ModemManager IPA sysfs link
     mkdir -p /tmp/mm_qmapmux_sysfs
     ln -sf /sys/devices/virtual/net/rmnet_ipa0 /tmp/mm_qmapmux_sysfs/lower_rmnet_ipa0 2>/dev/null || true
-
-    # Initialize IPA WAN pipes
-    if [ -x /usr/bin/rmnet-setup ] && [ -d /sys/class/net/rmnet_ipa0 ]; then
-        /usr/bin/rmnet-setup rmnet_ipa0 >/dev/null 2>&1 || true
-    fi
-
-    # 4. Wait for QRTR node 0 and modem QMI responsiveness, bring baseband online
-    for i in $(seq 1 30); do
-        if /usr/sbin/qmicli -d qrtr://0 --dms-get-operating-mode >/dev/null 2>&1; then
-            /usr/sbin/qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1 || true
-            break
-        fi
-        sleep 1
-    done
-
-    # 5. Synchronous SIM card provisioning loop
-    PROVISIONED=0
-    for i in $(seq 1 45); do
-        status=$(/usr/sbin/qmicli -d qrtr://0 --uim-get-card-status 2>/dev/null)
-        if echo "$status" | grep -q "Application state: 'ready'"; then
-            /usr/sbin/qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1 || true
-            break
-        elif [ "$PROVISIONED" -eq 0 ] && echo "$status" | grep -q "Application state: 'detected'"; then
-            AID=$(echo "$status" | awk '/Application type:.*usim/{found=1} found && /Application ID:/{getline; gsub(/[: \t\r\n]/,""); print $1; exit}')
-            [ -z "$AID" ] && AID=$(echo "$status" | awk '/Application ID:/{getline; gsub(/[: \t\r\n]/,""); print $1; exit}')
-            [ -z "$AID" ] && AID="A0000000871002F230FF018907020000"
-            /usr/sbin/qmicli -d qrtr://0 --uim-change-provisioning-session="session-type=primary-gw-provisioning,activate=yes,slot=1,aid=$AID" >/dev/null 2>&1 || true
-            PROVISIONED=1
-        fi
-        sleep 1
-    done
-
-    # Final guarantee: ensure baseband is online
-    /usr/sbin/qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1 || true
 
     return 0
 }
 
 stop_post() {
-    killall -9 ModemManager.real 2>/dev/null || true
+    killall -9 ModemManager ModemManager.real 2>/dev/null || true
 }

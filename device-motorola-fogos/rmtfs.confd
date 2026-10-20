@@ -1,1 +1,2 @@
+export LD_PRELOAD="/usr/lib/libqrtr-fix.so"
 command_args="-r -P"

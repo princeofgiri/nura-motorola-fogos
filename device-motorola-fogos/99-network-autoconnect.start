@@ -9,53 +9,60 @@
     nmcli radio wifi on 2>/dev/null || true
     nmcli dev set wlan0 autoconnect yes 2>/dev/null || true
 
-    # 2. Wait for NetworkManager and connect Wi-Fi
-    for i in $(seq 1 30); do
-        if nmcli -t -f DEVICE,STATE dev status 2>/dev/null | grep -q '^wlan0:connected'; then
-            break
-        fi
-        if nmcli dev status 2>/dev/null | grep -E '^wlan0\s+wifi' >/dev/null; then
-            ip link set wlan0 up 2>/dev/null || true
-            nmcli dev wifi rescan 2>/dev/null || true
-            for con in $(nmcli -t -f NAME,TYPE con show 2>/dev/null | grep ':802-11-wireless$' | cut -d: -f1); do
-                if nmcli con up "$con" 2>/dev/null; then
-                    break 2
-                fi
-            done
-        fi
-        sleep 2
-    done
+    # 2. Trigger RMNET IPA setup if needed
+    if [ -x /usr/bin/rmnet-setup ] && [ -d /sys/class/net/rmnet_ipa0 ]; then
+        /usr/bin/rmnet-setup rmnet_ipa0 >/dev/null 2>&1 || true
+    fi
 
-    # 3. Ensure SIM is provisioned if ModemManager missed it during early boot
-    for i in $(seq 1 15); do
-        status=$(qmicli -d qrtr://0 --uim-get-card-status 2>/dev/null)
-        if echo "$status" | grep -q "session doesn't exist" && echo "$status" | grep -q "Application state: 'detected'"; then
-            AID=$(echo "$status" | awk '/Application type:.*usim/{found=1} found && /Application ID:/{getline; gsub(/[: \t\r\n]/,""); print $1; exit}')
-            [ -z "$AID" ] && AID="A0000000871002F230FF018907020000"
-            qmicli -d qrtr://0 --uim-change-provisioning-session="session-type=primary-gw-provisioning,activate=yes,slot=1,aid=$AID" >/dev/null 2>&1 || true
-            qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1 || true
-            if mmcli -m any 2>&1 | grep -i -E 'sim-missing|failed|error' >/dev/null; then
-                rc-service modemmanager restart >/dev/null 2>&1 || true
+    # 3. Parallel autoconnect loop for Wi-Fi and GSM
+    WIFI_DONE=0
+    GSM_DONE=0
+
+    for i in $(seq 1 45); do
+        # Check Wi-Fi
+        if [ "$WIFI_DONE" -eq 0 ]; then
+            if nmcli -t -f DEVICE,STATE dev status 2>/dev/null | grep -q '^wlan0:connected'; then
+                WIFI_DONE=1
+            elif nmcli dev status 2>/dev/null | grep -E '^wlan0\s+wifi' >/dev/null; then
+                ip link set wlan0 up 2>/dev/null || true
+                for con in $(nmcli -t -f NAME,TYPE con show 2>/dev/null | grep ':802-11-wireless$' | cut -d: -f1); do
+                    if nmcli con up "$con" 2>/dev/null; then
+                        WIFI_DONE=1
+                        break
+                    fi
+                done
             fi
-            break
-        elif echo "$status" | grep -q "Application state: 'ready'"; then
-            break
         fi
-        sleep 1
-    done
 
-    # 4. Wait for ModemManager and connect Cellular (GSM)
-    for i in $(seq 1 30); do
-        if nmcli -t -f DEVICE,STATE dev status 2>/dev/null | grep -q 'gsm:connected'; then
-            break
-        fi
-        if nmcli dev status 2>/dev/null | grep -E '^qrtr0\s+gsm' >/dev/null; then
-            for con in $(nmcli -t -f NAME,TYPE con show 2>/dev/null | grep ':gsm$' | cut -d: -f1); do
-                if nmcli con up "$con" 2>/dev/null; then
-                    break 2
+        # Check GSM (Cellular)
+        if [ "$GSM_DONE" -eq 0 ]; then
+            if nmcli -t -f DEVICE,STATE dev status 2>/dev/null | grep -q 'gsm:connected'; then
+                GSM_DONE=1
+            else
+                # Ensure SIM is provisioned if detected
+                status=$(qmicli -d qrtr://0 --uim-get-card-status 2>/dev/null)
+                if echo "$status" | grep -q "session doesn't exist" && echo "$status" | grep -q "Application state: 'detected'"; then
+                    AID=$(echo "$status" | awk '/Application type:.*usim/{found=1} found && /Application ID:/{getline; gsub(/[: \t\r\n]/,""); print $1; exit}')
+                    [ -z "$AID" ] && AID="A0000000871002F230FF018907020000"
+                    qmicli -d qrtr://0 --uim-change-provisioning-session="session-type=primary-gw-provisioning,activate=yes,slot=1,aid=$AID" >/dev/null 2>&1 || true
+                    qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1 || true
+                    mmcli -S >/dev/null 2>&1 || true
+                elif echo "$status" | grep -q "Application state: 'ready'"; then
+                    qmicli -d qrtr://0 --dms-set-operating-mode=online >/dev/null 2>&1 || true
                 fi
-            done
+
+                if nmcli dev status 2>/dev/null | grep -E '^[a-zA-Z0-9_.]+\s+gsm' >/dev/null; then
+                    for con in $(nmcli -t -f NAME,TYPE con show 2>/dev/null | grep ':gsm$' | cut -d: -f1); do
+                        if nmcli con up "$con" 2>/dev/null; then
+                            GSM_DONE=1
+                            break
+                        fi
+                    done
+                fi
+            fi
         fi
+
+        [ "$WIFI_DONE" -eq 1 ] && [ "$GSM_DONE" -eq 1 ] && break
         sleep 2
     done
 ) </dev/null >/dev/null 2>&1 &

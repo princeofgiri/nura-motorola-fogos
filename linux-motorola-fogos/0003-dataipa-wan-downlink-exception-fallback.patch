@@ -1,0 +1,95 @@
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa.c
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa.c
+@@ -187,7 +187,7 @@
+ void ipa_assert(void)
+ {
+ 	pr_err("IPA: unrecoverable error has occurred, asserting\n");
+-	BUG();
++	WARN_ON(1);
+ }
+ EXPORT_SYMBOL(ipa_assert);
+ 
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c
+@@ -3234,7 +3234,9 @@
+ 			continue;
+ 		}
+ 
+-		if (status.endp_dest_idx == (sys->ep - ipa3_ctx->ep)) {
++		if (status.endp_dest_idx == (sys->ep - ipa3_ctx->ep) ||
++		    status.endp_src_idx == ipa3_get_ep_mapping(IPA_CLIENT_Q6_WAN_PROD) ||
++		    status.endp_src_idx == ipa3_get_ep_mapping(IPA_CLIENT_Q6_DL_NLO_DATA_PROD)) {
+ 			/* RX data */
+ 			src_pipe = status.endp_src_idx;
+ 
+@@ -3244,8 +3246,13 @@
+ 			 */
+ 			if (status.exception ==
+ 				IPAHAL_PKT_STATUS_EXCEPTION_NONE &&
+-				ipahal_is_rule_miss_id(status.rt_rule_id))
+-				sys->drop_packet = true;
++				ipahal_is_rule_miss_id(status.rt_rule_id)) {
++				if (src_pipe == ipa3_get_ep_mapping(IPA_CLIENT_Q6_WAN_PROD) ||
++				    src_pipe == ipa3_get_ep_mapping(IPA_CLIENT_Q6_DL_NLO_DATA_PROD))
++					sys->drop_packet = false;
++				else
++					sys->drop_packet = true;
++			}
+ 
+ 			if (skb->len == pkt_status_sz &&
+ 				status.exception ==
+@@ -3645,6 +3652,37 @@
+ 	IPADBG_LOW("ucp: %d\n", *(u8 *)(rx_skb->cb + 4));
+ 
+ 	spin_lock(&ipa3_ctx->disconnect_lock);
++	if (src_pipe == ipa3_get_ep_mapping(IPA_CLIENT_Q6_WAN_PROD) ||
++	    src_pipe == ipa3_get_ep_mapping(IPA_CLIENT_Q6_DL_NLO_DATA_PROD)) {
++		int wan_ep = ipa3_get_ep_mapping(IPA_CLIENT_APPS_WAN_CONS);
++
++		if (wan_ep >= 0 && ipa3_ctx->ep[wan_ep].valid &&
++		    ipa3_ctx->ep[wan_ep].client_notify) {
++			u8 mux_id = (metadata >> 8) & 0xFF;
++			u16 pkt_len;
++			u8 *qmap;
++
++			if (!mux_id)
++				mux_id = (metadata >> 16) & 0xFF;
++			if (!mux_id)
++				mux_id = 1;
++			pkt_len = rx_skb->len;
++			qmap = skb_push(rx_skb, 4);
++			qmap[0] = 0;
++			qmap[1] = mux_id;
++			qmap[2] = (pkt_len >> 8) & 0xFF;
++			qmap[3] = pkt_len & 0xFF;
++			client_notify = ipa3_ctx->ep[wan_ep].client_notify;
++			client_priv = ipa3_ctx->ep[wan_ep].priv;
++			spin_unlock(&ipa3_ctx->disconnect_lock);
++			pr_info_ratelimited("IPA_WAN_RX: redirected %u bytes to rmnet_ipa0 (mux %u)\n",
++				pkt_len, mux_id);
++			client_notify(client_priv, IPA_RECEIVE,
++					(unsigned long)(rx_skb));
++			trace_ipa3_lan_rx_cb_exit(status.endp_src_idx);
++			return;
++		}
++	}
+ 	if (likely((!atomic_read(&ep->disconnect_in_progress)) &&
+ 				ep->valid && ep->client_notify)) {
+ 		client_notify = ep->client_notify;
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_qmi_service.c
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_qmi_service.c
+@@ -1533,13 +1533,7 @@
+ 
+ 	if (rc != 0) {
+ 		IPAWANERR("ipa3_qmi_init_modem_send_sync_msg failed\n");
+-		/*
+-		 * Hardware not responding.
+-		 * This is a very unexpected scenario
+-		 * which requires a kernel panic in
+-		 * order to force dumps for QMI/Q6 side analysis.
+-		 */
+-		BUG();
++		return;
+ 	}
+ 	ipa3_qmi_modem_init_fin = true;
+ 

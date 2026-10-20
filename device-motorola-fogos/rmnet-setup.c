@@ -7,7 +7,7 @@
 #include <net/if.h>
 #include <stdint.h>
 
-#define RMNET_IOCTL_EXTENDED                 0x000089F1
+#define RMNET_IOCTL_EXTENDED                 0x000089FD
 #define RMNET_IOCTL_SET_EGRESS_DATA_FORMAT   0x0006
 #define RMNET_IOCTL_SET_INGRESS_DATA_FORMAT  0x0007
 #define RMNET_IOCTL_ADD_MUX_CHANNEL          0x0005

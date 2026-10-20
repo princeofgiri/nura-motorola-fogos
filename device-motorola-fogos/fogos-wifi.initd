@@ -60,6 +60,19 @@ start() {
         sed -i 's/WirelessEnabled=false/WirelessEnabled=true/' /var/lib/NetworkManager/NetworkManager.state 2>/dev/null || true
     fi
 
+    # Spawn background supervisor to ensure wlan0 is brought up and autoconnects even during delayed Hexagon firmware load
+    (
+        for i in $(seq 1 60); do
+            if [ -d /sys/class/net/wlan0 ]; then
+                ip link set wlan0 up 2>/dev/null || true
+                nmcli dev set wlan0 autoconnect yes 2>/dev/null || true
+                nmcli dev wifi rescan 2>/dev/null || true
+                break
+            fi
+            sleep 1
+        done
+    ) >/dev/null 2>&1 &
+
     eend 0
 }
 

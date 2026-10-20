@@ -1,0 +1,65 @@
+#!/sbin/openrc-run
+description="Motorola Moto G34 5G Audio Initializer"
+
+depend() {
+    need pd-mapper rmtfs
+    before tinydm pulseaudio pipewire
+}
+
+start() {
+    ebegin "Initializing fogos audio hardware and ALSA DAIs"
+
+    # 1. Boot Hexagon ADSP
+    echo 1 > /sys/kernel/boot_adsp/boot 2>/dev/null || true
+
+    # 2. Load missing audio techpack kernel modules
+    for m in pinctrl_lpi_dlkm swr_ctrl_dlkm tx_macro_dlkm rx_macro_dlkm va_macro_dlkm wcd937x_slave_dlkm stub_dlkm native_dlkm fs1815_dlkm machine_dlkm; do
+        modprobe "$m" 2>/dev/null || true
+    done
+
+    # Wait for ALSA sound card to register
+    for i in $(seq 1 20); do
+        [ -d /proc/asound/card0 ] && break
+        sleep 0.5
+    done
+
+    if [ -d /proc/asound/card0 ]; then
+        # 3. Initialize FS1815 Smart Amplifier
+        amixer -c 0 cset name="FSM_Init" 1 2>/dev/null || true
+        amixer -c 0 cset name="FSM_Amp_Switch" 1 2>/dev/null || true
+        amixer -c 0 cset name="FSM_Scene" 0 2>/dev/null || true
+
+        # 4. Route MultiMedia1 to Speaker (RX_CDC_DMA_RX_0 & FS1815)
+        amixer -c 0 cset name="RX_CDC_DMA_RX_0 Audio Mixer MultiMedia1" 1 2>/dev/null || true
+        amixer -c 0 cset name="RX_CDC_DMA_RX_0 Channels" Two 2>/dev/null || true
+        amixer -c 0 cset name="RX_MACRO RX0 MUX" AIF1_PB 2>/dev/null || true
+        amixer -c 0 cset name="RX_MACRO RX1 MUX" AIF1_PB 2>/dev/null || true
+        amixer -c 0 cset name="RX INT0_1 MIX1 INP0" RX0 2>/dev/null || true
+        amixer -c 0 cset name="EAR_RDAC Switch" 1 2>/dev/null || true
+        amixer -c 0 cset name="RDAC3_MUX" RX1 2>/dev/null || true
+        amixer -c 0 cset name="RX INT0 DEM MUX" CLSH_DSM_OUT 2>/dev/null || true
+        amixer -c 0 cset name="RX_EAR Mode" ON 2>/dev/null || true
+        amixer -c 0 cset name="RX INT2_1 MIX1 INP0" RX1 2>/dev/null || true
+        amixer -c 0 cset name="AUX_RDAC Switch" 1 2>/dev/null || true
+        amixer -c 0 cset name="RX HPH Mode" CLS_AB 2>/dev/null || true
+        amixer -c 0 cset name="RX_COMP1 Switch" 1 2>/dev/null || true
+        amixer -c 0 cset name="HPHL_COMP Switch" 1 2>/dev/null || true
+        amixer -c 0 cset name="AUX PATH Mode" HP_MODE 2>/dev/null || true
+        amixer -c 0 cset name="RX_RX0 Digital Volume" 84 2>/dev/null || true
+        amixer -c 0 cset name="RX_RX1 Digital Volume" 84 2>/dev/null || true
+
+        # 5. Route Main Microphone (TX_CDC_DMA_TX_3 to MultiMedia1)
+        amixer -c 0 cset name="MultiMedia1 Mixer TX_CDC_DMA_TX_3" 1 2>/dev/null || true
+        amixer -c 0 cset name="TX DEC0 MUX" SWR_MIC 2>/dev/null || true
+        amixer -c 0 cset name="ADC1 ChMap" SWRM_TX1_CH1 2>/dev/null || true
+        amixer -c 0 cset name="TX SMIC MUX0" SWR_MIC0 2>/dev/null || true
+        amixer -c 0 cset name="TX_CDC_DMA_TX_3 Channels" One 2>/dev/null || true
+        amixer -c 0 cset name="TX_AIF1_CAP Mixer DEC0" 1 2>/dev/null || true
+        amixer -c 0 cset name="ADC1_MIXER Switch" 1 2>/dev/null || true
+        amixer -c 0 cset name="ADC1 Volume" 8 2>/dev/null || true
+        amixer -c 0 cset name="TX_DEC0 Volume" 84 2>/dev/null || true
+        eend 0
+    else
+        eend 1 "ALSA card0 failed to register"
+    fi
+}

@@ -28,7 +28,7 @@ depends="
 	eudev-libs
 	python3
 	unzip
-	sound-theme-oxygen
+	oxygen-sounds
 "
 makedepends="
 	devicepkg-dev

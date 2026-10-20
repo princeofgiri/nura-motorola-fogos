@@ -115,7 +115,7 @@ def main():
 
     try:
         fd_pwr = os.open(pwr_dev, os.O_RDONLY | os.O_NONBLOCK)
-        fcntl.ioctl(fd_pwr, EVIOCGRAB, 1)
+        # Do not grab exclusively with EVIOCGRAB so KEY_VOLUMEDOWN (code 114) can reach kwin/Plasma
     except Exception as e:
         sys.stderr.write(f"fogos-powerd: Failed to grab power button: {e}\n")
         sys.exit(1)
@@ -256,10 +256,6 @@ def main():
                             last_tap_time = now
 
     # Cleanup on exit
-    try:
-        fcntl.ioctl(fd_pwr, EVIOCGRAB, 0)
-    except Exception:
-        pass
     os.close(fd_pwr)
     if fd_touch is not None:
         os.close(fd_touch)

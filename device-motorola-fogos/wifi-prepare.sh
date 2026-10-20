@@ -99,4 +99,88 @@ if [ -f "$QML_INDICATOR" ]; then
     sed -i 's/visible: (!isInternetIndicatorMobileData.*/visible: !isInternetIndicatorMobileData \&\& MobileShell.SignalStrengthInfo.showIndicator/g' "$QML_INDICATOR" 2>/dev/null || true
 fi
 
+# 8. Fix InternetIndicator.qml to prioritize Wi-Fi connection icon over mobile data
+QML_INTERNET="/usr/lib/qt6/qml/org/kde/plasma/private/mobileshell/InternetIndicator.qml"
+if [ -f "$QML_INTERNET" ] && ! grep -q "wifiConnectedIcon" "$QML_INTERNET"; then
+    cat << 'QMLEOD' > "$QML_INTERNET"
+/*
+    SPDX-FileCopyrightText: 2021 Devin Lin <espidev@gmail.com>
+    SPDX-FileCopyrightText: 2019 Marco Martin <mart@kde.org>
+    SPDX-FileCopyrightText: 2013-2017 Jan Grulich <jgrulich@redhat.com>
+
+    SPDX-License-Identifier: LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-KDE-Accepted-LGPL
+*/
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls as QQC2
+import org.kde.plasma.networkmanagement as PlasmaNM
+import org.kde.kirigami as Kirigami
+
+Item {
+    id: connectionIcon
+
+    readonly property var netModel: PlasmaNM.NetworkModel {
+        id: nmModel
+    }
+
+    readonly property string wifiConnectedIcon: {
+        for (let i = 0; i < nmModel.rowCount(); i++) {
+            let idx = nmModel.index(i, 0);
+            let type = nmModel.data(idx, PlasmaNM.NetworkModel.TypeRole);
+            let state = nmModel.data(idx, PlasmaNM.NetworkModel.ConnectionStateRole);
+            if (type === 14 && state === 2) {
+                let sig = nmModel.data(idx, PlasmaNM.NetworkModel.SignalRole);
+                if (sig <= 20) return "network-wireless-connected-20";
+                if (sig <= 40) return "network-wireless-connected-40";
+                if (sig <= 60) return "network-wireless-connected-60";
+                if (sig <= 80) return "network-wireless-connected-80";
+                return "network-wireless-connected-100";
+            }
+        }
+        return "";
+    }
+
+    readonly property string icon: {
+        if (wirelessStatus.hotspotSSID.length !== 0) {
+            return "network-wireless-hotspot";
+        }
+        if (wifiConnectedIcon.length !== 0) {
+            return wifiConnectedIcon;
+        }
+        return connectionIconProvider.connectionIcon;
+    }
+
+    readonly property bool indicatorRunning: connectionIconProvider.connecting
+
+    readonly property var wirelessStatus: PlasmaNM.WirelessStatus {
+        id: wirelessStatus
+    }
+
+    readonly property var connectionIcon: PlasmaNM.ConnectionIcon {
+        id: connectionIconProvider
+    }
+
+    // Internet icon, only show while visible
+    Kirigami.Icon {
+        id: internetIcon
+
+        anchors.fill: parent
+        visible: !connectingIndicator.visible
+        source: connectionIcon.icon
+    }
+
+    // Connecting indicator
+    QQC2.BusyIndicator {
+        id: connectingIndicator
+
+        anchors.fill: parent
+        running: connectionIcon.indicatorRunning
+        visible: running
+    }
+}
+QMLEOD
+fi
+
+
 

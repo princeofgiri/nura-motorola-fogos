@@ -191,5 +191,30 @@ Exec=/usr/lib/libexec/spacebar-daemon
 DBUSEOD
 fi
 
+# 10. Ensure default notification sound theme (Oxygen) is configured
+mkdir -p /etc/xdg
+if [ ! -f /etc/xdg/kdeglobals ] || ! grep -q "\[Sounds\]" /etc/xdg/kdeglobals 2>/dev/null; then
+    cat <<'KDEEOD' >> /etc/xdg/kdeglobals
+
+[Sounds]
+Enable=true
+Theme=oxygen
+KDEEOD
+fi
+
+if [ -d /home/symbiot/.config ]; then
+    mkdir -p /home/symbiot/.config
+    if ! grep -q "\[Sounds\]" /home/symbiot/.config/kdeglobals 2>/dev/null; then
+        cat <<'KDEEOD' >> /home/symbiot/.config/kdeglobals
+
+[Sounds]
+Enable=true
+Theme=oxygen
+KDEEOD
+        chown -R symbiot:symbiot /home/symbiot/.config/kdeglobals 2>/dev/null || true
+    fi
+fi
+
+
 
 

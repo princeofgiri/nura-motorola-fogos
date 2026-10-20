@@ -182,5 +182,14 @@ Item {
 QMLEOD
 fi
 
+# 9. Ensure Spacebar messaging daemon D-Bus auto-activation service exists
+if [ ! -f /usr/share/dbus-1/services/org.kde.spacebar.Daemon.service ]; then
+    cat <<'DBUSEOD' > /usr/share/dbus-1/services/org.kde.spacebar.Daemon.service
+[D-BUS Service]
+Name=org.kde.spacebar.Daemon
+Exec=/usr/lib/libexec/spacebar-daemon
+DBUSEOD
+fi
+
 
 

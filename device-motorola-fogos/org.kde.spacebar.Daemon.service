@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.kde.spacebar.Daemon
+Exec=/usr/lib/libexec/spacebar-daemon

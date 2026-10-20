@@ -58,8 +58,25 @@ start() {
         amixer -c 0 cset name="ADC1_MIXER Switch" 1 2>/dev/null || true
         amixer -c 0 cset name="ADC1 Volume" 8 2>/dev/null || true
         amixer -c 0 cset name="TX_DEC0 Volume" 84 2>/dev/null || true
+
+        # 6. Configure PulseAudio for Qualcomm Hexagon ADSP (disable broken timer scheduling, set 48kHz native rate)
+        if [ -f /etc/pulse/default.pa ]; then
+            sed -i 's/load-module module-udev-detect$/load-module module-udev-detect tsched=0/' /etc/pulse/default.pa 2>/dev/null || true
+        fi
+        if [ -f /etc/pulse/daemon.conf ]; then
+            sed -i 's/^;* *high-priority = .*/high-priority = yes/' /etc/pulse/daemon.conf 2>/dev/null || true
+            sed -i 's/^;* *realtime-scheduling = .*/realtime-scheduling = yes/' /etc/pulse/daemon.conf 2>/dev/null || true
+            sed -i 's/^;* *realtime-priority = .*/realtime-priority = 9/' /etc/pulse/daemon.conf 2>/dev/null || true
+            sed -i 's/^;* *avoid-resampling = .*/avoid-resampling = yes/' /etc/pulse/daemon.conf 2>/dev/null || true
+            sed -i 's/^;* *default-sample-rate = .*/default-sample-rate = 48000/' /etc/pulse/daemon.conf 2>/dev/null || true
+            sed -i 's/^;* *alternate-sample-rate = .*/alternate-sample-rate = 44100/' /etc/pulse/daemon.conf 2>/dev/null || true
+            sed -i 's/^;* *default-fragments = .*/default-fragments = 8/' /etc/pulse/daemon.conf 2>/dev/null || true
+            sed -i 's/^;* *default-fragment-size-msec = .*/default-fragment-size-msec = 10/' /etc/pulse/daemon.conf 2>/dev/null || true
+        fi
+
         eend 0
     else
         eend 1 "ALSA card0 failed to register"
     fi
 }
+

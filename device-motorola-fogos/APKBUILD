@@ -10,7 +10,7 @@ maintainer="Fogos Porter <fogos@example.com>"
 pkgname=device-motorola-fogos
 pkgdesc="Motorola Moto G34 5G"
 pkgver=3
-pkgrel=18
+pkgrel=19
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -74,6 +74,7 @@ source="
 	50-kgsl.rules
 	rmnet-setup.c
 	99-network-autoconnect.start
+	20-audio-rlimits.conf
 "
 
 build() {
@@ -149,8 +150,9 @@ package() {
 	install -Dm755 "$srcdir/fogos-powerd.py" "$pkgdir/usr/bin/fogos-powerd.py"
 	install -Dm755 "$srcdir/fogos-powerd.initd" "$pkgdir/etc/init.d/fogos-powerd"
 
-	# PulseAudio audio configuration
+	# PulseAudio audio configuration and realtime limits
 	install -Dm644 "$srcdir/50-fogos.pa" "$pkgdir/etc/pulse/default.pa.d/50-fogos.pa"
+	install -Dm644 "$srcdir/20-audio-rlimits.conf" "$pkgdir/etc/security/limits.d/20-audio-rlimits.conf"
 
 	# RMNET IPA WAN initialization helper
 	install -Dm755 "$srcdir/rmnet-setup" "$pkgdir/usr/bin/rmnet-setup"
@@ -176,7 +178,7 @@ ce205c3b1670f615c159c961da632c4aa4bd1283925c664712f1ccb4fb924a40ec8ce5a6b6f986a8
 c74e5952cdcd9e0bf083fba61ea8256472d03e532cb4f81ea8db6fdfea5dfe43bd9cde2ffebc4c8bf8452810685c353d21619538c557e55c172cb73f8c7e27c0  rmtfs.confd
 1adfc0084347dd87801308fc8d4f2559171f863ddc44ffa11022ea77b2b6e747605691ad19baa7fcf11e7edbef449c5ecd4649e990693faf18d1175eaa7e9475  modemmanager.confd
 205eb566a87580f0549821df2c18d38ae8a2a67a4e6446bc97fb89ede2ec0536b2e7728ed23133d42d7d26fbde2524cf7fad2a4a17811fa45a99413f32eac832  00-subsys-ssr.start
-f63c8e27bc3aeed70e895579faacc39698a0b6a271771008f55daca6774c81282dee48f07dca26131a8a1b2f2a8abdaf8b4e57d8ba2247c2473faa96dd45f5e4  fogos-audio.initd
+ab31dcd8d11b48b267140536e3d728e4046fec8f1c8c5624f419f3bc1f5330591b69ccffe62975dd71ee7d76a4f3c583494d4df74c812fadec2d47d7a619561c  fogos-audio.initd
 cd4792f985fe2a7408a893f002f8b2b6b03ac2325d6d550d22fe613b54cde5d8c8aab18a033b930af82b2f300530a8607dbc6db4451def20d2ef0779510a996d  display.start
 72a9d9c59099023c15e1e29014c2fcb35d59b81d1441708e6339f4361df7587968c8b308e2a42b6139ceb3697732a2aa5df290ae2d3d3ce1b111ab15576cb509  touchscreen.start
 826b9058d0f5a3a4e84094babbfdebc71dd9b2fe9a834bc8f1ac17d6594dab3957a83e5fc9d6175edb54fb17faeedbc500bda9229991f318c56023974acc9101  modemmanager.initd
@@ -201,4 +203,5 @@ c6b1970541118379e52cd06644d50e8085e62a6bb24523b19236066d9fb0cb54dfa9a88c12567000
 e513df93eddb9a01344103a7c2d3d07babd33767083ff66007086d091cf709ba929e7686a34cbbc403197b4ab5c0e9c8cf3e138a149b96839ecb348b16ff06e5  50-kgsl.rules
 968ffa2df15bd3c984d10f987e97ff5d28e0e5ed25edec3673c760f366c2a67addabe96ec9703e14667764d76886812064cbef7621c66a3f237a04c830042eab  rmnet-setup.c
 b8ca817f62d511a16abc6f6b4cb87dc95b145779f653ce00a253b00ba198a6254ffb5912df780dc0b35032db5cfe507771b77eba0595a33e60575ff319a1eaed  99-network-autoconnect.start
+3e23b2519b4f6e5633f9a7ddebedf0d08730296ac672503baf5b47af9f798b1b11af2538ce5ce65d49132abbf7e48411d85052fe45d274470e6a0ee618fdeda3  20-audio-rlimits.conf
 "
